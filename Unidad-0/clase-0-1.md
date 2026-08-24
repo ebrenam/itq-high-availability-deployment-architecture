@@ -6,7 +6,7 @@ A nivel de 6° semestre de Ingeniería en Sistemas Computacionales, estos son lo
 
 **1. Desarrollo e ingeniería de software (Backend)**
 
-- **Java intermedio (JDK 17+):** Dominio de programación orientada a objetos, manejo de excepciones, colecciones (`List`, `Map`), uso de anotaciones y comprensión del ciclo de vida de un _build_ con **Apache Maven** (`pom.xml`, dependencias, _plugins_).
+- **Java intermedio (JDK 25+):** Dominio de programación orientada a objetos, manejo de excepciones, colecciones (`List`, `Map`), uso de anotaciones y comprensión del ciclo de vida de un _build_ con **Apache Maven** (`pom.xml`, dependencias, _plugins_).
 
 - **Conceptos de APIs REST:** Manejo explícito de verbos HTTP (`GET`, `POST`, `PUT`, `DELETE`), códigos de estado HTTP (`200`, `204`, `400`, `404`, `500`), parámetros de ruta/consulta y formateo de datos en **JSON**.
 
