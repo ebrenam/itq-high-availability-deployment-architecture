@@ -12,11 +12,84 @@ Para evitar que una falla local destruya el sistema completo, implementamos dos 
 
 - **Circuit breaker:** Actúa como un interruptor eléctrico de seguridad. Supervisa las llamadas a un servicio externo o dependiente. Si la tasa de errores o la latencia supera un umbral definido, el circuito se abre (_open state_), cortando inmediatamente las llamadas posteriores y devolviendo una respuesta rápida de error o un _fallback_. Después de un período de enfriamiento (_cooldown_), pasa a un estado semi-abierto (_half-open_) para probar si el servicio remoto se ha recuperado.
 
+#### Circuit Breaker: Máquina de Estados
+
+```mermaid
+graph TD
+    CLOSED["🟢 CLOSED<br/>(Funcionando Normal)<br/>Permite requests"]
+    OPEN["🔴 OPEN<br/>(Cortado)<br/>Rechaza requests"]
+    HALF["🟡 HALF_OPEN<br/>(Probando)<br/>Permite 1 request"]
+    
+    CLOSED -->|"N fallos consecutivos<br/>O latencia > umbral"| OPEN
+    OPEN -->|"Espera cooldown<br/>timeout = 5s"| HALF
+    HALF -->|"Falla"| OPEN
+    HALF -->|"Éxito"| CLOSED
+    
+    style CLOSED fill:#c8e6c9
+    style OPEN fill:#ffcdd2
+    style HALF fill:#fff9c4
+```
+
 - **Retry con _exponential backoff_ y _jitter_:** Reintenta operaciones fallidas de forma automática. Para no saturar un servicio que apenas se está recuperando de una caída (_retry storm_), se aplica un tiempo de espera exponencial entre reintentos (_exponential backoff_) sumado a un factor aleatorio (_jitter_) que desincroniza las peticiones concurrentes.
+
+#### Retry: Backoff Exponencial
+
+```mermaid
+graph LR
+    R1["Intento 1<br/>FALLA<br/>Espera: 100ms"]
+    R2["Intento 2<br/>FALLA<br/>Espera: 200ms"]
+    R3["Intento 3<br/>FALLA<br/>Espera: 400ms"]
+    R4["Intento 4<br/>ÉXITO ✓<br/>Resultado"]
+    
+    R1 --> R2
+    R2 --> R3
+    R3 --> R4
+    
+    style R1 fill:#ffcdd2
+    style R2 fill:#ffcdd2
+    style R3 fill:#ffcdd2
+    style R4 fill:#c8e6c9
+```
 
 - **Rate limiting:** Limita la cantidad de peticiones que un cliente o microservicio puede realizar en una ventana de tiempo específica. Protege la infraestructura contra picos de tráfico inesperados, ataques de denegación de servicio (_DoS_) y garantiza un consumo justo de recursos.
 
 - **Bulkhead:** Inspirado en los mamparos estancos de los barcos. Divide los recursos del sistema (como _thread pools_ o _connection pools_) en compartimentos aislados. Si un _pool_ de hilos se agota por culpa de una base de datos lenta, los demás microservicios o hilos continúan operando con normalidad.
+
+#### Bulkhead: Thread Pools Aislados
+
+```mermaid
+graph TD
+    subgraph "Microservicio"
+        direction LR
+        LB["Load Balancer<br/>Incoming Requests"]
+    end
+    
+    subgraph "Pool 1: Database Queries"
+        T1["Thread 1"]
+        T2["Thread 2"]
+        T3["Thread 3"]
+    end
+    
+    subgraph "Pool 2: External Payments"
+        T4["Thread 1"]
+        T5["Thread 2"]
+    end
+    
+    LB -->|DB queries| T1
+    LB -->|DB queries| T2
+    LB -->|DB queries| T3
+    LB -->|Payment API| T4
+    LB -->|Payment API| T5
+    
+    T4 -.->|"Si se agota:<br/>Payment falla"| T5
+    T1 -->|"Pool 1 sigue<br/>funcionando ✓"| T2
+    
+    style T1 fill:#c8e6c9
+    style T2 fill:#c8e6c9
+    style T3 fill:#c8e6c9
+    style T4 fill:#ffcdd2
+    style T5 fill:#ffcdd2
+```
 
 - **Fallback:** Proporciona una ruta alternativa de degradación elegante (_graceful degradation_) cuando falla la llamada principal (por ejemplo, devolver datos guardados en caché o un valor por defecto seguro).
 
@@ -33,6 +106,56 @@ Para evitar que una falla local destruya el sistema completo, implementamos dos 
 ### Balanceo de carga y distribución de tráfico
 
 El _load balancing_ es fundamental para distribuir las solicitudes entre múltiples instancias saludables de un microservicio. Se puede ejecutar en el lado del servidor (_server-side load balancing_ mediante componentes como un _Ingress Controller_ o un _Load Balancer_ de nube) o en el lado del cliente (_client-side load balancing_ como el integrado en arquitecturas de _service mesh_ mediante proxies como Envoy), aplicando algoritmos como _Round Robin_, _Least Connections_ o _IP Hash_.
+
+#### Load Balancing: Estrategias
+
+```mermaid
+graph TB
+    subgraph "ROUND ROBIN"
+        direction LR
+        C1["Cliente 1"]
+        C2["Cliente 2"]
+        C3["Cliente 3"]
+        C4["Cliente 4"]
+        LB1["LB"]
+        S1a["Server 1"]
+        S2a["Server 2"]
+        S3a["Server 3"]
+        
+        C1 --> LB1
+        C2 --> LB1
+        C3 --> LB1
+        C4 --> LB1
+        
+        LB1 -->|"Req 1"| S1a
+        LB1 -->|"Req 2"| S2a
+        LB1 -->|"Req 3"| S3a
+        LB1 -->|"Req 4"| S1a
+    end
+    
+    subgraph "LEAST CONNECTIONS"
+        direction LR
+        C1b["Cliente 1"]
+        C2b["Cliente 2"]
+        LB2["LB"]
+        S1b["Server 1<br/>(1 conn)"]
+        S2b["Server 2<br/>(5 conns)"]
+        S3b["Server 3<br/>(2 conns)"]
+        
+        C1b --> LB2
+        C2b --> LB2
+        
+        LB2 -->|"Envía a<br/>Server 1"| S1b
+        LB2 -->|"Envía a<br/>Server 3"| S3b
+    end
+    
+    style S1a fill:#c8e6c9
+    style S2a fill:#c8e6c9
+    style S3a fill:#c8e6c9
+    style S1b fill:#c8e6c9
+    style S3b fill:#c8e6c9
+    style S2b fill:#ffccbc
+```
 
 ## 2. Analogía del mundo real
 

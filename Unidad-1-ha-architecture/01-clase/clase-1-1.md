@@ -47,7 +47,36 @@ Pionera por Google, la disciplina de SRE (_Site Reliability Engineering_) aplica
 
 $$\text{Disponibilidad} = \frac{\text{MTBF}}{\text{MTBF} + \text{MTTR}} \times 100$$
 
-## 2. Analogía del mundo real
+### Visualización: Relación entre SLI, SLO y SLA
+
+```mermaid
+graph TD
+    A["SLI (Service Level Indicator)<br/>Medida en tiempo real<br/>Ej: 99.2% requests exitosos"] --> B["SLO (Service Level Objective)<br/>Meta interna del equipo<br/>Ej: 99.5% debe responder en &lt;200ms"]
+    B --> C["SLA (Service Level Agreement)<br/>Contrato con usuarios<br/>Ej: 99% o descuento del 10%"]
+    
+    style A fill:#e1f5ff
+    style B fill:#fff3e0
+    style C fill:#ffebee
+```
+
+### Visualización: Componentes de Disponibilidad
+
+```mermaid
+graph LR
+    MTTF["MTTF<br/>(Mean Time To Failure)<br/>Tiempo hasta primera falla"]
+    MTTR["MTTR<br/>(Mean Time To Repair)<br/>Tiempo para reparar"]
+    MTBF["MTBF = MTTF + MTTR"]
+    AVAIL["Disponibilidad %"]
+    
+    MTTF --> MTBF
+    MTTR --> MTBF
+    MTBF --> AVAIL
+    
+    style MTTF fill:#c8e6c9
+    style MTTR fill:#ffccbc
+    style MTBF fill:#bbdefb
+    style AVAIL fill:#f8bbd0
+```
 
 Imagina la cocina de un restaurante de alta cocina con una estrella Michelin durante la hora pico de un viernes.
 
@@ -63,7 +92,21 @@ Imagina la cocina de un restaurante de alta cocina con una estrella Michelin dur
 
 - **Error Budget:** Si el equipo sabe que puede fallar en el 5% de las órdenes (su SLO es 95%), tienen margen de maniobra durante la semana para probar nuevos platillos en el menú. Pero si acumulan demasiados clientes insatisfechos a principio de mes, cancelan las pruebas culinarias y se apegan estrictamente a los platillos tradicionales hasta recuperar el margen.
 
-## 3. Desglose técnico paso a paso
+### Visualización: Cascada de Fallos (Dominó)
+
+```mermaid
+graph LR
+    A["Servicio A<br/>Status: 🔴 DOWN"] -->|"Retry Storm<br/>100 req/s"| B["Servicio B<br/>Status: 🟡 DEGRADED"]
+    B -->|"100 req/s<br/>+ propias 50 req/s"| C["Servicio C<br/>Status: 🔴 DOWN"]
+    C -->|"Thread Pool<br/>Agotado"| D["Servicio D<br/>Status: 🔴 DOWN"]
+    
+    style A fill:#ffcdd2
+    style B fill:#fff9c4
+    style C fill:#ffcdd2
+    style D fill:#ffcdd2
+```
+
+## 2. Analogía del mundo real
 
 Para afianzar cómo aterrizamos los fundamentos de confiabilidad en código Java utilizando el framework **Quarkus**, construiremos un _health check_ y una medición básica de disponibilidad sin depender todavía de una plataforma completa de observabilidad.
 

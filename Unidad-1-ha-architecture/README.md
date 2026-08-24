@@ -1,5 +1,23 @@
 # Unidad 1: Arquitecturas de alta disponibilidad y escalabilidad
 
+## Estructura de la Unidad
+
+```text
+01-clase/                    # Clases teóricas
+├── clase-1-1.md           # Fundamentos de disponibilidad y confiabilidad
+├── clase-1-2.md           # Patrones de diseño para resiliencia
+└── clase-1-3.md           # Despliegue en la nube y zonas de disponibilidad
+
+02-laboratorio/            # Laboratorio con proyecto funcional
+├── laboratorio-1.md       # Especificación del laboratorio integrador
+└── proyecto-base/         # Código base (catalog-service)
+    ├── desplegar.sh
+    ├── docker-compose.yml
+    ├── validar.sh
+    ├── catalog-service/
+    └── ...
+```
+
 ## Objetivos de aprendizaje
 
 - Identificar los factores que afectan la disponibilidad y la confiabilidad en sistemas distribuidos.
@@ -76,15 +94,13 @@
 
 - Simulación de fallos y propuesta de mitigación.
 
-## Prácticas sugeridas
-
-- **Práctica 1.1: Mapeo de Patrones de Resiliencia en Arquitectura Cloud.** El alumno identificará y organizará visualmente los patrones de resiliencia necesarios para garantizar alta disponibilidad en un entorno de microservicios distribuido.
-
-- **Práctica 1.2: Simulación de Fallo y Propuesta de Mitigación.** El alumno analizará una arquitectura real, simulará el fallo de un componente clave y propondrá una estrategia de mitigación efectiva.
-
 ## Punto de partida recomendado
 
-La unidad debe iniciar con `u1-starter`: una base mínima funcional de la plataforma e-commerce con el esqueleto del sistema y un primer servicio operativo (`catalog-service`). El resultado final de esta unidad se convierte en el starter de la Unidad 2.
+La unidad debe iniciar con `u1-starter`: una base mínima funcional de la plataforma e-commerce con el esqueleto del sistema y un primer servicio operativo (`catalog-service`). Ver [02-laboratorio/proyecto-base](./02-laboratorio/proyecto-base/) y [02-laboratorio/laboratorio-1.md](./02-laboratorio/laboratorio-1.md). El resultado final de esta unidad se convierte en el starter de la Unidad 2.
+
+**Flujo pedagógico:**
+1. **Semanas 1-2:** Clases teóricas (1.1, 1.2, 1.3) establecen conceptos
+2. **Semanas 3-4:** Laboratorio integrador aplica todo lo aprendido en un proyecto real
 
 ## Bibliografía
 

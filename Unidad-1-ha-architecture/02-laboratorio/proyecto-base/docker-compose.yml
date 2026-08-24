@@ -1,0 +1,71 @@
+# Docker Compose - Plataforma E-commerce - Unidad 1
+# Alternativa para ejecutar sin Kubernetes
+# Compatible con Docker Desktop en Windows, Linux y macOS
+
+version: "3.8"
+
+services:
+  # ========================================
+  # Catalog Service - Servicio de Catálogo
+  # ========================================
+  catalog-service:
+    build:
+      context: ./catalog-service
+      dockerfile: Dockerfile
+    container_name: catalog-service
+    ports:
+      - "8080:8080"
+    environment:
+      - QUARKUS_LOG_LEVEL=INFO
+      - QUARKUS_HTTP_HOST=0.0.0.0
+      - QUARKUS_HTTP_PORT=8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ecommerce-network
+    restart: unless-stopped
+    labels:
+      - "com.itq.service=catalog"
+      - "com.itq.version=1.0.0"
+      - "com.itq.unit=unidad-1"
+
+# ========================================
+# Network Configuration
+# ========================================
+networks:
+  ecommerce-network:
+    driver: bridge
+    name: ecommerce-platform
+
+# ========================================
+# INSTRUCCIONES DE USO
+# ========================================
+#
+# Iniciar todos los servicios:
+#   docker-compose up -d
+#
+# Ver logs:
+#   docker-compose logs -f catalog-service
+#
+# Detener servicios:
+#   docker-compose down
+#
+# Reconstruir imágenes:
+#   docker-compose build
+#   docker-compose up -d
+#
+# Acceder al servicio:
+#   curl http://localhost:8080/v1/products
+#   curl http://localhost:8080/health
+#
+# Ver estado de servicios:
+#   docker-compose ps
+#
+# Escalar servicios (simular réplicas):
+#   docker-compose up -d --scale catalog-service=3
+#
+# ========================================
