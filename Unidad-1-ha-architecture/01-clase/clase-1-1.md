@@ -49,34 +49,11 @@ $$\text{Disponibilidad} = \frac{\text{MTBF}}{\text{MTBF} + \text{MTTR}} \times 1
 
 ### Visualización: Relación entre SLI, SLO y SLA
 
-```mermaid
-graph TD
-    A["SLI (Service Level Indicator)<br/>Medida en tiempo real<br/>Ej: 99.2% requests exitosos"] --> B["SLO (Service Level Objective)<br/>Meta interna del equipo<br/>Ej: 99.5% debe responder en &lt;200ms"]
-    B --> C["SLA (Service Level Agreement)<br/>Contrato con usuarios<br/>Ej: 99% o descuento del 10%"]
-    
-    style A fill:#e1f5ff
-    style B fill:#fff3e0
-    style C fill:#ffebee
-```
+![services](image-1-1.jpeg)
 
 ### Visualización: Componentes de Disponibilidad
 
-```mermaid
-graph LR
-    MTTF["MTTF<br/>(Mean Time To Failure)<br/>Tiempo hasta primera falla"]
-    MTTR["MTTR<br/>(Mean Time To Repair)<br/>Tiempo para reparar"]
-    MTBF["MTBF = MTTF + MTTR"]
-    AVAIL["Disponibilidad %"]
-    
-    MTTF --> MTBF
-    MTTR --> MTBF
-    MTBF --> AVAIL
-    
-    style MTTF fill:#c8e6c9
-    style MTTR fill:#ffccbc
-    style MTBF fill:#bbdefb
-    style AVAIL fill:#f8bbd0
-```
+![disponibilidad](image-1-2.jpeg)
 
 Imagina la cocina de un restaurante de alta cocina con una estrella Michelin durante la hora pico de un viernes.
 
@@ -94,17 +71,7 @@ Imagina la cocina de un restaurante de alta cocina con una estrella Michelin dur
 
 ### Visualización: Cascada de Fallos (Dominó)
 
-```mermaid
-graph LR
-    A["Servicio A<br/>Status: 🔴 DOWN"] -->|"Retry Storm<br/>100 req/s"| B["Servicio B<br/>Status: 🟡 DEGRADED"]
-    B -->|"100 req/s<br/>+ propias 50 req/s"| C["Servicio C<br/>Status: 🔴 DOWN"]
-    C -->|"Thread Pool<br/>Agotado"| D["Servicio D<br/>Status: 🔴 DOWN"]
-    
-    style A fill:#ffcdd2
-    style B fill:#fff9c4
-    style C fill:#ffcdd2
-    style D fill:#ffcdd2
-```
+![domino](image-1-3.jpeg)
 
 ## 2. Analogía del mundo real
 
