@@ -249,5 +249,3 @@ Durante una actualización de mantenimiento a mitad de mes, una mala configuraci
 1. ¿El equipo agotó el _error budget_ correspondiente a ese mes de 30 días? Muestra el cálculo matemático que respalda tu respuesta.
 
 2. Si el tiempo de detección de la falla por las alertas (_Time to Detect_) fue de 5 minutos, ¿qué acciones de diseño de infraestructura o instrumentación de métricas implementarías para reducir el **MTTR** en el siguiente evento sin tocar el código fuente de Java?
-
-> "En la sesión anterior analizamos cómo cuantificar la confiabilidad mediante métricas como SLI y SLO e identificar los puntos únicos de fallo, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar patrones de diseño como circuit breaker, bulkhead y rate limiting para aislar y tolerar fallas de forma arquitectónica."

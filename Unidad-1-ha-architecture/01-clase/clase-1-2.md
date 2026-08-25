@@ -217,5 +217,3 @@ Durante una venta nocturna de alto tráfico, la base de datos relacional subyace
 1. ¿Por qué la combinación actual de ese _@Retry_ agresivo junto al _Circuit Breaker_ empeorará la caída de la base de datos en lugar de protegerla?
 
 2. Si aplicamos la arquitectura de patrón **Saga** para procesar una compra que involucra tres microservicios (_Ordenes_, _Pagos_ e _Inventario_), ¿qué sucede si la transacción falla en el último paso (_Inventario_)? Explica el flujo de las transacciones compensatorias y cómo se garantiza la consistencia eventual entre los servicios.
-
-> "En la sesión anterior analizamos cómo implementar patrones de resiliencia como circuit breaker y bulkhead a nivel de aplicación, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar la infraestructura multi-AZ y arquitecturas tolerantes a fallos en la nube."

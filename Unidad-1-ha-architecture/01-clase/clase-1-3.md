@@ -18,31 +18,7 @@ Los proveedores de nube pública estructuran su infraestructura global en tres n
 
 #### Jerarquía: Región → AZs → Data Centers
 
-```mermaid
-graph TD
-    AWS["AWS Cloud (Global)"]
-    
-    AWS --> REGION1["Region: us-east-1<br/>(N. Virginia)"]
-    AWS --> REGION2["Region: sa-east-1<br/>(São Paulo)"]
-    AWS --> REGION3["Region: eu-west-1<br/>(Irlanda)"]
-    
-    REGION1 --> AZ1["AZ 1a<br/>DC con energía<br/>y red redundante"]
-    REGION1 --> AZ2["AZ 1b<br/>DC con energía<br/>y red redundante"]
-    REGION1 --> AZ3["AZ 1c<br/>DC con energía<br/>y red redundante"]
-    
-    REGION2 --> AZ4["AZ 2a"]
-    REGION2 --> AZ5["AZ 2b"]
-    
-    AZ1 -->|"Latencia < 2ms"| AZ2
-    AZ2 -->|"Latencia < 2ms"| AZ3
-    AZ3 -.->|"Latencia >> 100ms"| REGION2
-    
-    style AZ1 fill:#c8e6c9
-    style AZ2 fill:#c8e6c9
-    style AZ3 fill:#c8e6c9
-    style AZ4 fill:#ffccbc
-    style AZ5 fill:#ffccbc
-```
+![region](image-3-1.jpeg)
 
 #### Estrategias de despliegue: Multi-AZ vs. Multi-Región
 
@@ -54,73 +30,7 @@ graph TD
 
 #### Single-AZ vs. Multi-AZ Comparación Visual
 
-```mermaid
-graph TB
-    subgraph "Single-AZ ❌ (Riesgoso)"
-        direction LR
-        LB1["Load Balancer<br/>(us-east-1a)"]
-        DB1["Database<br/>(us-east-1a)"]
-        S1["Server 1"]
-        S2["Server 2"]
-        S3["Server 3"]
-        
-        LB1 --> S1
-        LB1 --> S2
-        LB1 --> S3
-        S1 --> DB1
-        S2 --> DB1
-        S3 --> DB1
-        
-        FALLA1["🔥 Corte energía AZ 1a"]
-        FALLA1 -.->|"TODO cae ❌"| LB1
-    end
-    
-    subgraph "Multi-AZ ✅ (Resiliente)"
-        direction TB
-        subgraph "AZ 1a"
-            direction LR
-            LB2a["LB"]
-            S1a["Server"]
-            DB1a["DB\n(Primary)"]
-            LB2a --> S1a --> DB1a
-        end
-        
-        subgraph "AZ 1b"
-            direction LR
-            LB2b["LB"]
-            S2a["Server"]
-            DB1b["DB\n(Replica)"]
-            LB2b --> S2a --> DB1b
-        end
-        
-        subgraph "AZ 1c"
-            direction LR
-            LB2c["LB"]
-            S3a["Server"]
-            DB1c["DB\n(Replica)"]
-            LB2c --> S3a --> DB1c
-        end
-        
-        LB2a -.->|"Sync replication"| DB1b
-        LB2a -.->|"Sync replication"| DB1c
-        
-        FALLA2["🔥 Corte energía AZ 1a"]
-        FALLA2 -.->|"AZ 1b y 1c siguen ✓"| LB2b
-    end
-    
-    style S1 fill:#c8e6c9
-    style S2 fill:#c8e6c9
-    style S3 fill:#c8e6c9
-    style S1a fill:#c8e6c9
-    style S2a fill:#c8e6c9
-    style S3a fill:#c8e6c9
-    style DB1 fill:#c8e6c9
-    style DB1a fill:#c8e6c9
-    style DB1b fill:#fff9c4
-    style DB1c fill:#fff9c4
-    style FALLA1 fill:#ffcdd2
-    style FALLA2 fill:#ffcdd2
-```
+![single-multi](image-3-2.jpeg)
 
 #### Componentes clave a nivel de red e infraestructura Cloud-Native
 
@@ -132,52 +42,7 @@ graph TB
 
 #### VPC y Subredes
 
-```mermaid
-graph TB
-    IGW["Internet Gateway"]
-    
-    VPC["VPC: 10.0.0.0/16"]
-    
-    subgraph "Subred Pública (AZ 1a)"
-        direction LR
-        NAT["NAT Gateway"]
-        NGINX["Nginx Ingress"]
-    end
-    
-    subgraph "Subred Privada (AZ 1a)"
-        direction LR
-        K1a["Kubernetes Pod<br/>10.0.1.x"]
-        K1a2["Kubernetes Pod<br/>10.0.1.x"]
-    end
-    
-    subgraph "Subred Privada (AZ 1b)"
-        direction LR
-        K1b["Kubernetes Pod<br/>10.0.2.x"]
-    end
-    
-    subgraph "Subred Privada (DB)"
-        direction LR
-        DB["PostgreSQL Primary<br/>10.0.100.x"]
-        DB2["PostgreSQL Replica<br/>10.0.101.x"]
-    end
-    
-    IGW --> NGINX
-    NGINX --> NAT
-    NAT --> K1a
-    NGINX --> K1b
-    K1a --> DB
-    K1b --> DB2
-    DB -.->|"Replication<br/>Stream"| DB2
-    
-    style IGW fill:#bbdefb
-    style NGINX fill:#c8e6c9
-    style NAT fill:#c8e6c9
-    style K1a fill:#fff9c4
-    style K1a2 fill:#fff9c4
-    style K1b fill:#fff9c4
-    style DB fill:#c8e6c9
-    style DB2 fill:#fff9c4
-```
+![vpc](image-3-3.jpeg)
 
 ### 2. Analogía del mundo real
 
@@ -235,6 +100,7 @@ spec:
           labelSelector:
             matchLabels:
               app: order-service
+```
 
 #### Topology Spread Constraints: Distribución de Pods
 
@@ -299,6 +165,7 @@ graph TB
 
 El parámetro `maxSkew: 1` significa que la diferencia máxima de pods distribuidos entre AZs es de 1. Por ejemplo, si tenemos 6 replicas, cada AZ tendrá exactamente 2 pods. Si tenemos 7 replicas, dos AZs tendrán 2 pods y una AZ tendrá 3 pods (diferencia máxima = 1).
 
+```yaml
       containers:
         - name: order-service-container
           image: quay.io/acme/order-service-quarkus:1.0.0
@@ -391,5 +258,3 @@ Ocurre una falla masiva de infraestructura y la zona **`us-east-1a` queda comple
 1. ¿Qué impacto técnico inmediato experimentará el tráfico que procesaban las réplicas del microservicio que estaban en `us-east-1a` y cómo reaccionará el orquestador de Kubernetes?
 
 2. En la base de datos, al ocurrir la conmutación por error (_failover_) de la primaria hacia `us-east-1b`, ¿por qué las réplicas del microservicio en `us-east-1c` podrían experimentar una degradación temporal de latencia (_cross-AZ latency_) y qué costo financiero oculto genera este escenario en la factura de la nube?
-
-> "En la sesión anterior analizamos cómo estructurar la infraestructura _multi-AZ_ y tolerante a fallos en la nube, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar la arquitectura interna y componentes clave de Kubernetes."
