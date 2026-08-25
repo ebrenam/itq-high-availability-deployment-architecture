@@ -104,64 +104,7 @@ spec:
 
 #### Topology Spread Constraints: Distribución de Pods
 
-```mermaid
-graph TB
-    K8S["Kubernetes Cluster"]
-    
-    subgraph "SIN Topology Spread (❌ Riesgoso)"
-        direction TB
-        subgraph "AZ 1a - Node 1"
-            P1["Pod 1"]
-            P2["Pod 2"]
-            P3["Pod 3"]
-            P4["Pod 4"]
-            P5["Pod 5"]
-            P6["Pod 6"]
-        end
-        
-        subgraph "AZ 1b - Node 2"
-            P7["(vacío)"]
-        end
-        
-        NOTE1["Si AZ 1a cae → 6 pods pierden housing"]
-    end
-    
-    subgraph "CON Topology Spread (✅ Resiliente)"
-        direction TB
-        subgraph "AZ 1a - Node 1"
-            T1["Pod 1"]
-            T2["Pod 2"]
-        end
-        
-        subgraph "AZ 1b - Node 2"
-            T3["Pod 3"]
-            T4["Pod 4"]
-        end
-        
-        subgraph "AZ 1c - Node 3"
-            T5["Pod 5"]
-            T6["Pod 6"]
-        end
-        
-        NOTE2["maxSkew: 1<br/>Máxima diferencia = 1 pod<br/>entre AZs"]
-    end
-    
-    style P1 fill:#c8e6c9
-    style P2 fill:#c8e6c9
-    style P3 fill:#c8e6c9
-    style P4 fill:#c8e6c9
-    style P5 fill:#c8e6c9
-    style P6 fill:#c8e6c9
-    style P7 fill:#ffcdd2
-    style T1 fill:#c8e6c9
-    style T2 fill:#c8e6c9
-    style T3 fill:#c8e6c9
-    style T4 fill:#c8e6c9
-    style T5 fill:#c8e6c9
-    style T6 fill:#c8e6c9
-    style NOTE1 fill:#ffcdd2
-    style NOTE2 fill:#c8e6c9
-```
+![topology](image-3-4.jpeg)
 
 El parámetro `maxSkew: 1` significa que la diferencia máxima de pods distribuidos entre AZs es de 1. Por ejemplo, si tenemos 6 replicas, cada AZ tendrá exactamente 2 pods. Si tenemos 7 replicas, dos AZs tendrán 2 pods y una AZ tendrá 3 pods (diferencia máxima = 1).
 
