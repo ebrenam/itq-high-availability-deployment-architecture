@@ -197,14 +197,74 @@ public class CatalogResource {
 }
 ```
 
-### Paso 4: Observar los escenarios y calcular un SLI manual de disponibilidad
+### Paso 4: Laboratorio guiado: observar disponibilidad y degradación
 
-Usaremos una medición local basada en respuestas HTTP, contenido JSON y latencia. Así podrás distinguir entre una respuesta normal desde la base de datos primaria (`SUCCESS`) y una respuesta degradada desde la caché (`DEGRADED_CACHE`), sin depender todavía de Prometheus ni de Alertmanager.
+En esta práctica trabajarás con varias terminales para relacionar la solicitud del cliente, los _logs_ de Quarkus, el estado de salud y la respuesta entregada. No cierres ninguna terminal hasta terminar.
 
-Con la aplicación ejecutándose en otra terminal, ejecuta una ráfaga de solicitudes al endpoint real. El comando guarda el número de solicitud, el código HTTP, el tiempo total y el cuerpo de cada respuesta:
+#### Terminal 1: iniciar el servicio y observar los _logs_
+
+Desde la raíz del repositorio, inicia la aplicación:
+
+```bash
+cd Unidad-1-ha-architecture/02-laboratorio/proyecto-base/catalog-service
+./mvnw quarkus:dev
+```
+
+Deja esta terminal visible. Cada mensaje permitirá relacionar lo que sucede internamente con lo que observarás en las otras terminales:
+
+- `Catálogo retornado exitosamente desde la base de datos primaria.`: respuesta `SUCCESS`.
+- `Simulando latencia alta en consulta de catálogo...`: escenario que puede activar `Timeout` y `Fallback`.
+- `Falla de conexión a la base de datos primaria.`: fallo de la dependencia.
+- `Fallback activado: Sirviendo datos desde la memoria caché local.`: respuesta `DEGRADED_CACHE`.
+
+#### Terminal 2: comprobar los estados de salud
+
+Ejecuta las comprobaciones del servicio:
+
+```bash
+curl -i http://localhost:8080/health
+curl -i http://localhost:8080/ready
+curl -i http://localhost:8080/live
+```
+
+`/health` muestra el estado general, `/ready` indica si el servicio está listo para recibir tráfico y `/live` indica si el proceso está vivo. Para observar la simulación de disponibilidad del 95% del _readiness check_, repite varias veces:
 
 ```bash
 for i in {1..20}; do
+    printf '%02d ' "$i"
+    curl -s http://localhost:8080/ready
+    echo
+done
+```
+
+Busca respuestas `UP` y, eventualmente, `DOWN`. Un `DOWN` en `/ready` significa que Kubernetes debería retirar temporalmente el _Pod_ del tráfico; no significa necesariamente que el proceso haya muerto, porque `/live` puede continuar en `UP`.
+
+#### Terminal 3: generar tráfico y ver la respuesta en tiempo real
+
+Envía solicitudes al endpoint real. Cada línea muestra el cuerpo, el código HTTP y la latencia:
+
+```bash
+for i in {1..20}; do
+    printf '%02d ' "$i"
+    curl -sS -w ' | HTTP %{http_code} | tiempo %{time_total}s\n' http://localhost:8080/v1/products
+done
+```
+
+Relaciona cada línea con los _logs_ de la Terminal 1:
+
+- `SUCCESS` con el log de retorno desde la base de datos primaria.
+- `DEGRADED_CACHE` con el log de `Fallback`.
+- Una latencia cercana o superior a `0.8s` con el `Timeout` configurado en `800ms`.
+- Una respuesta `200` con `DEGRADED_CACHE` confirma que hay disponibilidad técnica, pero calidad funcional degradada.
+
+Los escenarios son aleatorios. Si no aparece `DEGRADED_CACHE`, repite este bloque; el código simula latencia alta en el 20% de los intentos y fallas de conexión en el 30%, antes de que `Retry`, `CircuitBreaker` y `Fallback` determinen la respuesta final.
+
+#### Terminal 4: guardar y clasificar una muestra
+
+Registra una muestra que incluya el cuerpo JSON, el código HTTP y la latencia:
+
+```bash
+for i in {1..40}; do
     response_file=$(mktemp)
     metadata=$(curl -sS -o "$response_file" -w "%{http_code} %{time_total}" http://localhost:8080/v1/products)
     printf '%02d %s %s\n' "$i" "$metadata" "$(cat "$response_file")"
@@ -212,14 +272,7 @@ for i in {1..20}; do
 done | tee availability-sample.txt
 ```
 
-El resultado tendrá una forma similar a esta:
-
-```text
-01 200 0.012345 {"status":"SUCCESS","data":["Product A","Product B","Product C"]}
-02 200 0.801234 {"status":"DEGRADED_CACHE","data":["Cached Product A","Cached Product B"]}
-```
-
-Cuenta los escenarios observables y las respuestas HTTP:
+Analiza la muestra:
 
 ```bash
 PRIMARY=$(grep -c '"status":"SUCCESS"' availability-sample.txt || true)
@@ -236,58 +289,11 @@ echo "Respuestas HTTP distintas de 200: $HTTP_ERRORS"
 echo "SLI de disponibilidad: $(echo "scale=4; $HTTP_200 / $TOTAL" | bc)"
 ```
 
-Interpreta los resultados de esta manera:
+#### Terminal 1 y Terminal 3: observar el circuito y la recuperación
 
-- `SUCCESS`: la consulta simulada terminó correctamente en la base de datos primaria.
-- `DEGRADED_CACHE`: se activó el `Fallback` por latencia, fallas, reintentos agotados o circuito abierto; el servicio siguió disponible, pero con datos degradados.
-- HTTP distinto de `200`: el endpoint no entregó una respuesta disponible para el usuario.
-- `HTTP 200` no significa necesariamente `SUCCESS`: en este proyecto el `Fallback` también responde `200`. Por eso se cuentan por separado disponibilidad técnica y calidad funcional.
+Genera más tráfico desde la Terminal 3 y observa simultáneamente la Terminal 1. Cuando se alcance el umbral del `CircuitBreaker`, algunas solicitudes pueden ir directamente al `Fallback` durante aproximadamente cinco segundos. Después de ese intervalo, continúa enviando solicitudes y observa si vuelven a aparecer respuestas `SUCCESS` cuando la simulación de la dependencia no falla.
 
-Los escenarios son aleatorios: una sola ejecución no garantiza observar todos los casos. Repite la ráfaga si no aparece `DEGRADED_CACHE`; el código simula latencia alta en el 20% de los intentos y fallas de conexión en el 30%, aunque `Retry`, `CircuitBreaker` y `Fallback` modifican lo que finalmente observa el cliente.
-
-### Paso 5: Verificar salud, degradación y recuperación
-
-1. Inicia la aplicación en modo desarrollo:
-
-    ```bash
-    cd Unidad-1-ha-architecture/02-laboratorio/proyecto-base/catalog-service
-    ./mvnw quarkus:dev
-    ```
-
-2. Revisa los tres endpoints de salud configurados por el proyecto:
-
-    ```bash
-    curl -i http://localhost:8080/health
-    curl -i http://localhost:8080/ready
-    curl -i http://localhost:8080/live
-    ```
-
-    `/health` muestra el estado general, `/ready` indica si el servicio está listo para recibir tráfico y `/live` indica si el proceso está vivo. La comprobación de _readiness_ simula una disponibilidad del 95%, por lo que conviene repetir `/ready` varias veces para observar respuestas `UP` y ocasionalmente `DOWN`.
-
-3. Genera tráfico sobre la API y observa en la respuesta los estados `SUCCESS` y `DEGRADED_CACHE`:
-
-    ```bash
-    for i in {1..20}; do
-        curl -sS -w ' | HTTP %{http_code} | tiempo %{time_total}s\n' http://localhost:8080/v1/products
-    done
-    ```
-
-4. Para relacionar el resultado con la causa, revisa la terminal donde corre Quarkus. Busca estos mensajes:
-
-    - `Catálogo retornado exitosamente desde la base de datos primaria.`: respuesta `SUCCESS`.
-    - `Simulando latencia alta en consulta de catálogo...`: escenario de timeout simulado.
-    - `Falla de conexión a la base de datos primaria.`: fallo de dependencia.
-    - `Fallback activado: Sirviendo datos desde la memoria caché local.`: respuesta `DEGRADED_CACHE`.
-
-5. Repite el tráfico después de cinco segundos. El `CircuitBreaker` permanece abierto durante ese intervalo cuando alcanza su umbral; durante ese periodo las solicitudes pueden ir directamente al `Fallback`. Después, nuevas solicitudes permiten observar si el servicio vuelve a `SUCCESS` cuando la simulación de la dependencia se recupera.
-
-6. Calcula la proporción de disponibilidad con el archivo generado en el paso anterior:
-
-    ```bash
-    HTTP_200=$(grep -cE '^[0-9]+ 200 ' availability-sample.txt || true)
-    TOTAL=$(wc -l < availability-sample.txt | tr -d ' ')
-    echo "Solicitudes disponibles: $HTTP_200 de $TOTAL"
-    ```
+Finalmente, interpreta los resultados: `SUCCESS` representa una respuesta normal; `DEGRADED_CACHE` representa continuidad del servicio con datos degradados; HTTP distinto de `200` representa una indisponibilidad del endpoint; y `/live` en `UP` junto con `/ready` en `DOWN` representa un proceso vivo que no debe recibir tráfico temporalmente.
 
 ## 4. Reto de ingeniería o pregunta de reflexión
 
