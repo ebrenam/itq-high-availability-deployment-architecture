@@ -4,12 +4,12 @@
 
 ## 📋 Descripción
 
-Este microservicio implementa el catálogo de productos con patrones de resiliencia y alta disponibilidad:
+Este microservicio es el starter del catálogo de productos. Incluye la simulación de latencia, fallas y health checks; los patrones de resiliencia se implementan durante el laboratorio de la clase 1.2:
 
-- ✅ **Circuit Breaker**: Protege contra fallos en cascada
-- ✅ **Retry**: Reintenta operaciones fallidas
-- ✅ **Timeout**: Previene esperas indefinidas
-- ✅ **Fallback**: Sirve datos degradados cuando el servicio principal falla
+- ⬜ **Circuit Breaker**: El alumno lo implementa en el laboratorio 1.2
+- ⬜ **Retry**: El alumno lo implementa en el laboratorio 1.2
+- ⬜ **Timeout**: El alumno lo implementa en el laboratorio 1.2
+- ⬜ **Fallback**: El alumno lo implementa en el laboratorio 1.2
 - ✅ **Health Checks**: Readiness y Liveness probes para Kubernetes
 
 ## 🛠️ Stack Tecnológico

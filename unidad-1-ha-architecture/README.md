@@ -10,6 +10,9 @@
 
 02-laboratorio/            # Laboratorio con proyecto funcional
 ├── laboratorio-1.md       # Especificación del laboratorio integrador
+├── laboratorio-clase-1-1.md # Línea base de disponibilidad
+├── laboratorio-clase-1-2.md # Patrones de resiliencia
+├── laboratorio-clase-1-3.md # Despliegue y autocuración
 └── proyecto-base/         # Código base (catalog-service)
     ├── desplegar.sh
     ├── docker-compose.yml
@@ -100,7 +103,10 @@ La unidad debe iniciar con `u1-starter`: una base mínima funcional de la plataf
 
 **Flujo pedagógico:**
 1. **Semanas 1-2:** Clases teóricas (1.1, 1.2, 1.3) establecen conceptos
-2. **Semanas 3-4:** Laboratorio integrador aplica todo lo aprendido en un proyecto real
+2. **Después de la clase 1.1:** [Laboratorio parcial 1.1](02-laboratorio/laboratorio-clase-1-1.md) establece la línea base
+3. **Después de la clase 1.2:** [Laboratorio parcial 1.2](02-laboratorio/laboratorio-clase-1-2.md) agrega resiliencia
+4. **Después de la clase 1.3:** [Laboratorio parcial 1.3](02-laboratorio/laboratorio-clase-1-3.md) agrega despliegue y autocuración
+5. **Cierre:** [Laboratorio integrador](02-laboratorio/laboratorio-1.md) reúne las evidencias
 
 ## Bibliografía
 

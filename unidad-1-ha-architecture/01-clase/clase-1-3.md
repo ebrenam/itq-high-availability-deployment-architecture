@@ -56,7 +56,9 @@ Imagina que administras la logística de entregas de una importante cadena de fa
 
 ### 3. Desglose técnico paso a paso
 
-Para garantizar que nuestros microservicios distribuidos toleren la caída completa de un _data center_ o AZ en producción, utilizaremos reglas de **Topology Spread Constraints** en un manifiesto de Kubernetes (_Deployment_) para forzar la alta disponibilidad a nivel de infraestructura.
+Esta sección se realiza como laboratorio parcial sobre el resultado de la clase 1.2. Sigue el [Laboratorio de la clase 1.3](../02-laboratorio/laboratorio-clase-1-3.md) para construir la imagen, revisar los manifiestos existentes, desplegar el servicio y demostrar autocuración.
+
+La referencia detallada que sigue usa exclusivamente `catalog-service`, sus tres réplicas, sus probes reales y los archivos `k8s/01-deployment.yaml` y `k8s/02-service.yaml`.
 
 #### Prerrequisitos de la infraestructura cloud
 
@@ -88,7 +90,7 @@ spec:
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
-          whenUnsatisfiable: DoNotSchedule
+          whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
               app: catalog-service

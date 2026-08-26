@@ -2,9 +2,13 @@
 
 ## 1. Objetivo del laboratorio y escenario real
 
-**El escenario:** Trabajas como _Junior Cloud Engineer_ en una plataforma e-commerce compuesta por `catalog-service`, `inventory-service`, `payment-service` y `orders-service`. Para esta primera unidad partirás de `u1-starter`, un proyecto base mínimo donde `catalog-service` ya existe como primera pieza funcional del sistema. Durante el último evento de ventas masivas, el servicio de catálogo colapsó por saturación de nodos y dependencia de una base de datos sin lectura replicada. La dirección de tecnología ha ordenado fortalecer esta primera pieza antes de seguir construyendo el resto de la plataforma.
+**El escenario:** Trabajas como _Junior Cloud Engineer_ en una plataforma e-commerce compuesta por `catalog-service`, `inventory-service`, `payment-service` y `orders-service`. Para esta primera unidad partirás de `u1-starter`, un proyecto base mínimo donde `catalog-service` ya existe como primera pieza funcional del sistema.
 
-**El objetivo:** En este laboratorio integrador fortalecerás `catalog-service` dentro de la misma plataforma e-commerce. Construirás, desplegarás y validarás una arquitectura en **Quarkus** sobre un clúster local de **Kubernetes** (Minikube o Kind) con simulación de topología _multi-AZ_. Implementarás patrones de resiliencia tanto en capa de aplicación (_circuit breaker_, _timeout_, _fallback_, _health checks_) como en capa de infraestructura (_topology spread constraints_, _readiness/liveness probes_, replicación). El resultado final de esta unidad será la base funcional que alimentará `u2-starter`.
+Durante el último evento de ventas masivas, el servicio de catálogo colapsó por saturación de nodos y dependencia de una base de datos sin lectura replicada. La dirección de tecnología ha ordenado fortalecer esta primera pieza antes de seguir construyendo el resto de la plataforma.
+
+**El objetivo:** Este laboratorio integra los resultados de los laboratorios parciales [1.1](laboratorio-clase-1-1.md), [1.2](laboratorio-clase-1-2.md) y [1.3](laboratorio-clase-1-3.md). No repite la implementación: consolida el `catalog-service` resiliente, valida su despliegue en Kubernetes y reúne las evidencias necesarias para entregar `u2-starter`.
+
+**Regla de continuidad:** completa los laboratorios parciales en orden. Si comienzas directamente aquí, el proyecto base será ejecutable, pero no tendrá los patrones de resiliencia que se evalúan en la integración.
 
 ## 2. Prerrequisitos y stack tecnológico
 
@@ -38,9 +42,9 @@ Asegúrate de mapear visualmente:
 
 4. La réplica de lectura de la base de datos (_Read Replica_).
 
-### Paso 2: Completar la instrumentación del microservicio en Quarkus
+### Paso 2: Confirmar el resultado del laboratorio parcial 1.2
 
-Partirás del starter `catalog-service`, que ya compila y expone `/v1/products`, pero comienza sin los patrones de resiliencia. En este paso completarás la instrumentación iniciada en la clase 1.2.
+Confirma que completaste el [Laboratorio de la clase 1.2](laboratorio-clase-1-2.md) y que `CatalogResource` contiene la implementación de resiliencia. En este laboratorio integrador no se vuelve a desarrollar el código.
 
 #### Archivo `pom.xml` (Dependencias clave)
 
@@ -65,7 +69,7 @@ Asegúrate de tener integradas las siguientes extensiones en tu proyecto Maven:
 
 #### Archivo `src/main/java/com/ecom/catalog/CatalogResource.java`
 
-Modifica el endpoint existente siguiendo el orden trabajado en clase: `@Timeout`, `@Retry`, `@Fallback` y `@CircuitBreaker`. No crees `PaymentResource` ni otro servicio.
+Verifica que el endpoint existente conserva el trabajo realizado en el laboratorio parcial 1.2. Si falta algún patrón, vuelve a ese laboratorio antes de continuar.
 
 ```java
 package com.ecom.catalog;
@@ -121,7 +125,7 @@ public class CatalogResource {
 
 #### Archivo `src/main/java/com/ecom/catalog/ReadinessHealthCheck.java`
 
-Verifica y, si es necesario, completa el _health check_ existente. Sus rutas son `/health`, `/ready` y `/live`, según `application.properties`.
+Verifica el _health check_ existente y sus rutas `/health`, `/ready` y `/live`, según `application.properties`.
 
 ```java
 package com.ecom.catalog;

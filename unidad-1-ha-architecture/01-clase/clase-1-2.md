@@ -64,27 +64,9 @@ Imagina la estructura y operación de un crucero transatlántico en alta mar:
 
 ## 3. Desglose técnico paso a paso
 
-Implementaremos los patrones de resiliencia directamente sobre el `catalog-service` que se inició en la clase 1.1. El starter conserva la latencia y los fallos simulados, pero el método `/v1/products` comienza sin protección.
+Esta sección se realiza como laboratorio parcial sobre el mismo proyecto de la clase 1.1. Sigue el [Laboratorio de la clase 1.2](../02-laboratorio/laboratorio-clase-1-2.md). Allí se implementan progresivamente `Timeout`, `Retry`, `Fallback` y `CircuitBreaker`, y se comparan los resultados con la línea base anterior.
 
-### Paso 1: Confirmar la dependencia
-
-Verifica que `pom.xml` contiene `quarkus-smallrye-fault-tolerance`. No agregues otro servicio ni otro paquete: el ejercicio se realiza sobre `src/main/java/com/ecom/catalog/CatalogResource.java`.
-
-### Paso 2: Implementar los patrones progresivamente
-
-Modifica `CatalogResource` en este orden y ejecuta una muestra de solicitudes después de cada cambio:
-
-1. Añade `@Timeout(800)` y observa cómo se controlan las consultas que tardan 1200 ms.
-2. Añade `@Retry(maxRetries = 2, delay = 150)` y registra cuántos intentos ocurren en los logs.
-3. Crea un método `getCatalogFallback()` que devuelva `DEGRADED_CACHE` y conéctalo mediante `@Fallback`.
-4. Añade `@CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000)`.
-5. Compara la línea base de 1.1 con las respuestas `SUCCESS`, `DEGRADED_CACHE`, los errores HTTP y la latencia.
-
-El alumno debe conservar evidencia de cada etapa y explicar qué problema resuelve cada patrón. `Bulkhead` se estudiará conceptualmente en esta clase, pero no se exige implementarlo en el starter porque el proyecto no tiene un flujo concurrente independiente que permita evaluarlo de forma clara.
-
-### Paso 3: Verificación
-
-Ejecuta el laboratorio guiado de la clase 1.1 sobre `/v1/products`. Comprueba que el `Fallback` responde con HTTP `200` y estado `DEGRADED_CACHE`, y que el `CircuitBreaker` puede enviar solicitudes directamente al respaldo durante su ventana de cinco segundos.
+No crees otro servicio ni copies el ejemplo conceptual de pagos: el entregable de esta clase es una modificación comprobable de `catalog-service`.
 
 ## 4. Reto de ingeniería o pregunta de reflexión
 
