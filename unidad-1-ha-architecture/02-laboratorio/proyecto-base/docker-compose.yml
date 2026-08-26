@@ -2,8 +2,6 @@
 # Alternativa para ejecutar sin Kubernetes
 # Compatible con Docker Desktop en Windows, Linux y macOS
 
-version: "3.8"
-
 services:
   # ========================================
   # Catalog Service - Servicio de Catálogo
@@ -20,7 +18,7 @@ services:
       - QUARKUS_HTTP_HOST=0.0.0.0
       - QUARKUS_HTTP_PORT=8080
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/ready"]
       interval: 10s
       timeout: 3s
       retries: 3

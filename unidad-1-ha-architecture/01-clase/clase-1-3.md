@@ -62,28 +62,27 @@ Para garantizar que nuestros microservicios distribuidos toleren la caída compl
 
 Un clúster de Kubernetes en la nube (como EKS, GKE, AKS u OKE) donde los nodos (_Worker Nodes_) están etiquetados automáticamente por el proveedor según su AZ: `topology.kubernetes.io/zone=us-east-1a` `topology.kubernetes.io/zone=us-east-1b` `topology.kubernetes.io/zone=us-east-1c`
 
-#### Paso 1: Definir el archivo de configuración del Deployment (`deployment-multi-az.yaml`)
+#### Paso 1: Revisar el Deployment del proyecto base (`k8s/01-deployment.yaml`)
 
-Crea un archivo llamado `deployment-multi-az.yaml` con la definición de un microservicio de Quarkus configurado para alta disponibilidad multi-zona:
+Abre el manifiesto existente del proyecto base. El alumno deberá revisarlo y ajustarlo, no crear un Deployment paralelo:
 
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: order-service-ha
-  namespace: production
+  name: catalog-service-deployment
   labels:
-    app.kubernetes.io/name: order-service
+    app.kubernetes.io/name: catalog-service
     app.kubernetes.io/part-of: e-commerce-platform
 spec:
-  replicas: 6
+  replicas: 3
   selector:
     matchLabels:
-      app: order-service
+      app: catalog-service
   template:
     metadata:
       labels:
-        app: order-service
+        app: catalog-service
     spec:
       # Restricción de distribución topológica entre AZs
       topologySpreadConstraints:
@@ -92,14 +91,14 @@ spec:
           whenUnsatisfiable: DoNotSchedule
           labelSelector:
             matchLabels:
-              app: order-service
+              app: catalog-service
         # Restricción secundaria: Evitar poner múltiples Pods en el mismo Nodo
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              app: order-service
+              app: catalog-service
 ```
 
 #### Topology Spread Constraints: Distribución de Pods
@@ -110,8 +109,8 @@ El parámetro `maxSkew: 1` significa que la diferencia máxima de pods distribui
 
 ```yaml
       containers:
-        - name: order-service-container
-          image: quay.io/acme/order-service-quarkus:1.0.0
+        - name: catalog-service
+          image: catalog-service:1.0.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -128,32 +127,31 @@ El parámetro `maxSkew: 1` significa que la diferencia máxima de pods distribui
           # Health checks esenciales para que el Load Balancer saque del pool la AZ dañada
           livenessProbe:
             httpGet:
-              path: /q/health/live
+              path: /health/live
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /q/health/ready
+              path: /health/ready
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 5
 ```
 
-#### Paso 2: Crear el servicio para exponer los Pods (`service-multi-az.yaml`)
+#### Paso 2: Revisar el Service del proyecto base (`k8s/02-service.yaml`)
 
-Crea el archivo `service-multi-az.yaml` para balancear el tráfico únicamente entre los _Pods_ que pasen la prueba de disponibilidad (_readiness probe_):
+Revisa el archivo existente `k8s/02-service.yaml` y confirma que selecciona `app: catalog-service` y expone el puerto 80 hacia el 8080 del contenedor:
 
 ```yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: order-service-lb
-  namespace: production
+  name: catalog-service-lb
 spec:
   type: LoadBalancer
   selector:
-    app: order-service
+    app: catalog-service
   ports:
     - protocol: TCP
       port: 80
@@ -165,24 +163,21 @@ spec:
 Ejecuta las siguientes instrucciones utilizando `kubectl`:
 
 ```bash
-# Crear el namespace de producción
-kubectl create namespace production
-
-# Aplicar los manifiestos de Deployment y Service
-kubectl apply -f deployment-multi-az.yaml
-kubectl apply -f service-multi-az.yaml
+# Aplicar los manifiestos existentes desde el directorio catalog-service
+kubectl apply -f k8s/01-deployment.yaml
+kubectl apply -f k8s/02-service.yaml
 ```
 
 #### Paso 4: Verificación del despliegue multi-AZ
 
-Verifica cómo Kubernetes distribuyó las 6 réplicas entre las diferentes Zonas de Disponibilidad:
+Verifica cómo Kubernetes distribuyó las 3 réplicas entre los nodos y las zonas disponibles:
 
 ```bash
 # Inspeccionar la ubicación de los Pods y sus nodos asignados
-kubectl get pods -n production -l app=order-service -o wide
+kubectl get pods -l app=catalog-service -o wide
 
 # Validar la distribución por etiquetas de zona (AZ)
-kubectl get pods -n production -l app=order-service \
+kubectl get pods -l app=catalog-service \
   -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.nodeName}{"\n"}{end}' | \
   while read pod node; do \
     zone=$(kubectl get node $node -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/zone}'); \

@@ -64,147 +64,27 @@ Imagina la estructura y operación de un crucero transatlántico en alta mar:
 
 ## 3. Desglose técnico paso a paso
 
-Implementaremos patrones de resiliencia (_Circuit Breaker_, _Retry_, _Timeout_, _Fallback_ y _Bulkhead_) en una aplicación **Quarkus** utilizando las especificaciones de **SmallRye Fault Tolerance** (MicroProfile Fault Tolerance).
+Implementaremos los patrones de resiliencia directamente sobre el `catalog-service` que se inició en la clase 1.1. El starter conserva la latencia y los fallos simulados, pero el método `/v1/products` comienza sin protección.
 
-### Paso 1: Agregar las dependencias al proyecto
+### Paso 1: Confirmar la dependencia
 
-Asegúrate de incluir la extensión de tolerancia a fallos en el archivo `pom.xml` de tu proyecto Quarkus:
+Verifica que `pom.xml` contiene `quarkus-smallrye-fault-tolerance`. No agregues otro servicio ni otro paquete: el ejercicio se realiza sobre `src/main/java/com/ecom/catalog/CatalogResource.java`.
 
-```xml
-<dependencies>
-    <!-- Extensión para servicios REST con RESTEasy Reactive -->
-    <dependency>
-        <groupId>io.quarkus</groupId>
-        <artifactId>quarkus-resteasy-reactive-jackson</artifactId>
-    </dependency>
-    <!-- Extensión SmallRye Fault Tolerance -->
-    <dependency>
-        <groupId>io.quarkus</groupId>
-        <artifactId>quarkus-smallrye-fault-tolerance</artifactId>
-    </dependency>
-</dependencies>
-```
+### Paso 2: Implementar los patrones progresivamente
 
-### Paso 2: Crear un cliente o servicio dependiente con fallas simuladas
+Modifica `CatalogResource` en este orden y ejecuta una muestra de solicitudes después de cada cambio:
 
-Crearemos un servicio que simule la comunicación con un sistema externo inestable (por ejemplo, una pasarela de pagos externa).
+1. Añade `@Timeout(800)` y observa cómo se controlan las consultas que tardan 1200 ms.
+2. Añade `@Retry(maxRetries = 2, delay = 150)` y registra cuántos intentos ocurren en los logs.
+3. Crea un método `getCatalogFallback()` que devuelva `DEGRADED_CACHE` y conéctalo mediante `@Fallback`.
+4. Añade `@CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000)`.
+5. Compara la línea base de 1.1 con las respuestas `SUCCESS`, `DEGRADED_CACHE`, los errores HTTP y la latencia.
 
-Crea el archivo `src/main/java/org/acme/resilience/ExternalPaymentService.java`:
+El alumno debe conservar evidencia de cada etapa y explicar qué problema resuelve cada patrón. `Bulkhead` se estudiará conceptualmente en esta clase, pero no se exige implementarlo en el starter porque el proyecto no tiene un flujo concurrente independiente que permita evaluarlo de forma clara.
 
-```java
-package org.acme.resilience;
+### Paso 3: Verificación
 
-import jakarta.enterprise.context.ApplicationScoped;
-import java.util.Random;
-
-@ApplicationScoped
-public class ExternalPaymentService {
-
-    private final Random random = new Random();
-
-    public String processPayment(String transactionId) throws Exception {
-        // Simular latencia o falla aleatoria
-        int chance = random.nextInt(10);
-        
-        if (chance < 6) { // 60% de probabilidad de falla
-            throw new RuntimeException("External payment gateway timeout/unreachable");
-        } else if (chance == 6 || chance == 7) { // 20% de probabilidad de respuesta lenta
-            Thread.sleep(3000); 
-        }
-
-        return "PAYMENT_SUCCESS_" + transactionId;
-    }
-}
-```
-
-### Paso 3: Aplicar anotaciones de resiliencia en el recurso REST
-
-Aplicaremos los patrones _@CircuitBreaker_, _@Retry_, _@Timeout_, _@Bulkhead_ y _@Fallback_ para proteger el punto de entrada de nuestro microservicio.
-
-Crea el archivo `src/main/java/org/acme/resilience/PaymentResource.java`:
-
-```java
-package org.acme.resilience;
-
-import org.eclipse.microprofile.faulttolerance.Bulkhead;
-import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Fallback;
-import org.eclipse.microprofile.faulttolerance.Retry;
-import org.eclipse.microprofile.faulttolerance.Timeout;
-import jakarta.inject.Inject;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.MediaType;
-import java.time.temporal.ChronoUnit;
-
-@Path("/v1/payments")
-public class PaymentResource {
-
-    @Inject
-    ExternalPaymentService paymentService;
-
-    @GET
-    @Path("/{id}")
-    @Produces(MediaType.APPLICATION_JSON)
-    // 1. TIMEOUT: Si la llamada tarda más de 1000ms, lanza TimeoutException
-    @Timeout(value = 1000, unit = ChronoUnit.MILLIS)
-    // 2. RETRY: Reintenta hasta 3 veces con un retraso inicial de 200ms y jitter
-    @Retry(maxRetries = 3, delay = 200, jitter = 100)
-    // 3. CIRCUIT BREAKER: Si el 50% de las últimas 4 peticiones fallan, abre el circuito por 5 segundos
-    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000)
-    // 4. BULKHEAD: Permite un máximo de 5 ejecuciones concurrentes en este método
-    @Bulkhead(value = 5)
-    // 5. FALLBACK: Si todo lo demás falla o el circuito está abierto, ejecuta este método de respaldo
-    @Fallback(fallbackMethod = "fallbackPaymentResponse")
-    public String checkout(@PathParam("id") String id) throws Exception {
-        return paymentService.processPayment(id);
-    }
-
-    // Método de Fallback (debe tener la misma firma que el método original)
-    public String fallbackPaymentResponse(String id) {
-        return "{\"status\": \"DEGRADED\", \"message\": \"Payment queued for asynchronous processing\", \"transaction_id\": \"" + id + "\"}";
-    }
-}
-```
-
-### Paso 4: Ajustar la configuración global de resiliencia
-
-Podemos sobreescribir o ajustar los valores de tolerancia a fallos directamente en el archivo `src/main/resources/application.properties` sin necesidad de recompilar el código Java:
-
-```properties
-# Habilitar o deshabilitar la tolerancia a fallos globalmente (útil para pruebas)
-smallrye.faulttolerance.enabled=true
-
-# Sobreescribir parámetros del Circuit Breaker para una clase o método específico
-org.acme.resilience.PaymentResource/checkout/CircuitBreaker/delay=8000
-org.acme.resilience.PaymentResource/checkout/CircuitBreaker/requestVolumeThreshold=6
-
-```
-
-### Paso 5: Verificación y pruebas de estrés
-
-1. Inicia la aplicación Quarkus en modo desarrollo:
-
-    ```bash
-    ./mvnw quarkus:dev
-    ```
-
-2. Ejecuta un script en la terminal para lanzar múltiples peticiones consecutivas y observar cómo el _Circuit Breaker_ cambia de estado y activa el _Fallback_:
-
-    ```bash
-    for i in {1..15}; do 
-      echo -n "Request $i: "; 
-      curl -s http://localhost:8080/v1/payments/TX-$i; 
-      echo ""; 
-      sleep 0.2; 
-    done
-    ```
-
-3. Observa los logs en la consola: cuando el número de fallas simula la apertura del circuito, las peticiones siguientes devolverán la respuesta del método `fallbackPaymentResponse` instantáneamente sin intentar llamar a `ExternalPaymentService`.
-
-4. Identifica manualmente en qué momento comienza la degradación controlada y qué patrón la está conteniendo (`Retry`, `CircuitBreaker`, `Bulkhead` o `Fallback`).
+Ejecuta el laboratorio guiado de la clase 1.1 sobre `/v1/products`. Comprueba que el `Fallback` responde con HTTP `200` y estado `DEGRADED_CACHE`, y que el `CircuitBreaker` puede enviar solicitudes directamente al respaldo durante su ventana de cinco segundos.
 
 ## 4. Reto de ingeniería o pregunta de reflexión
 

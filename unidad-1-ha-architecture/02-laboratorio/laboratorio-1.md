@@ -38,9 +38,9 @@ Asegúrate de mapear visualmente:
 
 4. La réplica de lectura de la base de datos (_Read Replica_).
 
-### Paso 2: Creación e instrumentación del microservicio en Quarkus
+### Paso 2: Completar la instrumentación del microservicio en Quarkus
 
-Estructuraremos un microservicio denominado `catalog-service` con tolerancia a fallos nativa.
+Partirás del starter `catalog-service`, que ya compila y expone `/v1/products`, pero comienza sin los patrones de resiliencia. En este paso completarás la instrumentación iniciada en la clase 1.2.
 
 #### Archivo `pom.xml` (Dependencias clave)
 
@@ -49,8 +49,8 @@ Asegúrate de tener integradas las siguientes extensiones en tu proyecto Maven:
 ```xml
 <dependencies>
     <dependency>
-        <groupId>io.quarkus</groupId>
-        <artifactId>quarkus-resteasy-reactive-jackson</artifactId>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-rest-jackson</artifactId>
     </dependency>
     <dependency>
         <groupId>io.quarkus</groupId>
@@ -65,7 +65,7 @@ Asegúrate de tener integradas las siguientes extensiones en tu proyecto Maven:
 
 #### Archivo `src/main/java/com/ecom/catalog/CatalogResource.java`
 
-Implementa la lógica del endpoint exponiendo patrones de resiliencia:
+Modifica el endpoint existente siguiendo el orden trabajado en clase: `@Timeout`, `@Retry`, `@Fallback` y `@CircuitBreaker`. No crees `PaymentResource` ni otro servicio.
 
 ```java
 package com.ecom.catalog;
@@ -121,7 +121,7 @@ public class CatalogResource {
 
 #### Archivo `src/main/java/com/ecom/catalog/ReadinessHealthCheck.java`
 
-Crea una verificación de disponibilidad personalizada para que Kubernetes sepa cuándo enviar tráfico al _Pod_:
+Verifica y, si es necesario, completa el _health check_ existente. Sus rutas son `/health`, `/ready` y `/live`, según `application.properties`.
 
 ```java
 package com.ecom.catalog;
@@ -185,9 +185,9 @@ kubectl label nodes minikube topology.kubernetes.io/zone=us-east-1a --overwrite
 # kubectl label nodes minikube-m02 topology.kubernetes.io/zone=us-east-1b --overwrite
 ```
 
-#### Archivo `k8s-manifests.yaml`
+#### Archivos `k8s/01-deployment.yaml` y `k8s/02-service.yaml`
 
-Crea el manifiesto que despliega 4 réplicas con restricciones de distribución topológica (_Topology Spread Constraints_), probas de salud y balanceo de carga:
+Completa los manifiestos existentes del proyecto base para desplegar 3 réplicas con restricciones de distribución topológica (_Topology Spread Constraints_), probes de salud y balanceo de carga. No crees un archivo `k8s-manifests.yaml` separado.
 
 ```yaml
 apiVersion: apps/v1
@@ -198,7 +198,7 @@ metadata:
   labels:
     app: catalog-service
 spec:
-  replicas: 4
+  replicas: 3
   selector:
     matchLabels:
       app: catalog-service
@@ -242,14 +242,14 @@ spec:
           # Configuración de Probes para autocuración
           livenessProbe:
             httpGet:
-              path: /q/health/live
+              path: /health/live
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /q/health/ready
+              path: /health/ready
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 5
@@ -274,14 +274,15 @@ spec:
 #### Aplicación de los manifiestos
 
 ```bash
-kubectl apply -f k8s-manifests.yaml
+kubectl apply -f k8s/01-deployment.yaml
+kubectl apply -f k8s/02-service.yaml
 ```
 
 ### Paso 5: Simulación de fallos en vivo y validación de resiliencia
 
 1. **Monitoreo de estado inicial:**
 
-    Verifica que los 4 _Pods_ estén en estado `Running` y hayan pasado la prueba de _Readiness_:
+    Verifica que las 3 réplicas estén en estado `Running` y hayan pasado la prueba de _Readiness_:
 
     ```bash
     kubectl get pods -l app=catalog-service -o wide
@@ -337,7 +338,7 @@ kubectl apply -f k8s-manifests.yaml
 
 ### Problema 2: Los Pods están `Running` pero nunca entran en estado `READY 1/1`
 
-- **Causa común:** La ruta configurada en la `readinessProbe` (`/q/health/ready`) está mal escrita o la aplicación está tardando más tiempo del permitido por el parámetro `initialDelaySeconds` en responder.
+- **Causa común:** La ruta configurada en la `readinessProbe` (`/health/ready`) está mal escrita o la aplicación está tardando más tiempo del permitido por el parámetro `initialDelaySeconds` en responder.
 
 - **Diagnóstico técnico:**
 

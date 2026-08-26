@@ -15,7 +15,7 @@ Este microservicio implementa el catálogo de productos con patrones de resilien
 ## 🛠️ Stack Tecnológico
 
 - **Java**: OpenJDK 25
-- **Framework**: Quarkus 3.33.0 LTS
+- **Framework**: Quarkus 3.38.0
 - **Build Tool**: Maven 3.9.6
 - **Container Runtime**: Docker/Podman
 - **Orchestrator**: Kubernetes 1.28+ (opcional)

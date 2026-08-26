@@ -47,7 +47,7 @@ mvnw.cmd quarkus:dev
 # En otra terminal
 curl http://localhost:8080/v1/products
 curl http://localhost:8080/v1/products/hello
-curl http://localhost:8080/health/ready
+curl http://localhost:8080/ready
 ```
 
 ### Generar carga para activar Circuit Breaker
@@ -306,7 +306,7 @@ kubectl get svc catalog-service-lb -o yaml | grep selector
 
 ```bash
 # Verificar readiness probe desde dentro del pod
-kubectl exec -it <POD_NAME> -- curl localhost:8080/health/ready
+kubectl exec -it <POD_NAME> -- curl localhost:8080/ready
 
 # Incrementar initialDelaySeconds si el servicio tarda en iniciar
 kubectl edit deployment catalog-service-deployment

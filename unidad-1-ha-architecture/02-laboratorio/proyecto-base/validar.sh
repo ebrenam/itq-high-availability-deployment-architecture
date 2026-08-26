@@ -130,10 +130,10 @@ echo "3. Validando configuración de Maven..."
 echo "-----------------------------------"
 
 # Verificar que el POM tenga las dependencias necesarias
-if grep -q "quarkus-resteasy-reactive-jackson" pom.xml; then
-    print_success "Dependencia quarkus-resteasy-reactive-jackson configurada"
+if grep -q "quarkus-rest-jackson" pom.xml; then
+    print_success "Dependencia quarkus-rest-jackson configurada"
 else
-    print_error "Falta dependencia quarkus-resteasy-reactive-jackson"
+    print_error "Falta dependencia quarkus-rest-jackson"
     ERRORS=$((ERRORS + 1))
 fi
 
@@ -150,46 +150,24 @@ else
     print_error "Falta dependencia quarkus-smallrye-fault-tolerance"
     ERRORS=$((ERRORS + 1))
 fi
-33" pom.xml; then
-    print_success "Quarkus versión 3.33 (LTS) configurada"
+if grep -q "<quarkus.platform.version>3.38.0</quarkus.platform.version>" pom.xml; then
+    print_success "Quarkus versión 3.38.0 configurada"
 else
-    print_warning "Versión de Quarkus diferente a 3.33 LTS
-else
-    print_warning "Versión de Quarkus diferente a 3.8.2"
+    print_warning "Versión de Quarkus diferente a 3.38.0"
 fi
 
 echo ""
 echo "4. Validando código fuente..."
 echo "-----------------------------------"
 
-# Verificar anotaciones de fault tolerance en CatalogResource
-if grep -q "@CircuitBreaker" src/main/java/com/ecom/catalog/CatalogResource.java; then
-    print_success "Circuit Breaker configurado"
-else
-    print_error "Circuit Breaker no encontrado"
-    ERRORS=$((ERRORS + 1))
-fi
-
-if grep -q "@Retry" src/main/java/com/ecom/catalog/CatalogResource.java; then
-    print_success "Retry configurado"
-else
-    print_error "Retry no encontrado"
-    ERRORS=$((ERRORS + 1))
-fi
-
-if grep -q "@Timeout" src/main/java/com/ecom/catalog/CatalogResource.java; then
-    print_success "Timeout configurado"
-else
-    print_error "Timeout no encontrado"
-    ERRORS=$((ERRORS + 1))
-fi
-
-if grep -q "@Fallback" src/main/java/com/ecom/catalog/CatalogResource.java; then
-    print_success "Fallback configurado"
-else
-    print_error "Fallback no encontrado"
-    ERRORS=$((ERRORS + 1))
-fi
+# El starter comienza sin estos patrones; el alumno los implementará en clase.
+for pattern in "@CircuitBreaker" "@Retry" "@Timeout" "@Fallback"; do
+    if grep -q "$pattern" src/main/java/com/ecom/catalog/CatalogResource.java; then
+        print_success "$pattern implementado"
+    else
+        print_info "$pattern pendiente: corresponde al ejercicio de resiliencia"
+    fi
+done
 
 # Verificar Health Check
 if grep -q "@Readiness" src/main/java/com/ecom/catalog/ReadinessHealthCheck.java; then

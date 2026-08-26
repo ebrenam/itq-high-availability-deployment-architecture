@@ -104,102 +104,19 @@ Desde el directorio `Unidad-1-ha-architecture/02-laboratorio/proyecto-base/catal
 </dependencies>
 ```
 
-### Paso 2: Crear un indicador de disponibilidad personalizado (_Health Check_)
+### Paso 2: Inspeccionar el health check del starter
 
-El proyecto contiene la clase `src/main/java/com/ecom/catalog/ReadinessHealthCheck.java`. Esta comprobación simula la conectividad del clúster de base de datos y devuelve `UP` el 95% de las veces, o `DOWN` el 5% restante.
+El proyecto contiene `src/main/java/com/ecom/catalog/ReadinessHealthCheck.java`. Ejecuta la aplicación y consulta `/health`, `/ready` y `/live`. Identifica qué endpoint representa la disponibilidad del servicio y qué comportamiento debería consumir Kubernetes más adelante.
 
-El código central de la clase es:
+### Paso 3: Medir el comportamiento inicial del servicio
 
-```java
-package com.ecom.catalog;
+El endpoint real del proyecto es `/v1/products`, implementado en `src/main/java/com/ecom/catalog/CatalogResource.java`. En este punto el starter todavía no tiene `Timeout`, `Retry`, `CircuitBreaker` ni `Fallback: el alumno debe observar primero la latencia y los errores que esos patrones deberán resolver.
 
-import org.eclipse.microprofile.health.HealthCheck;
-import org.eclipse.microprofile.health.HealthCheckResponse;
-import org.eclipse.microprofile.health.Readiness;
-import jakarta.enterprise.context.ApplicationScoped;
-import java.util.Random;
+Registra varias solicitudes y anota el código HTTP, el tiempo de respuesta y el contenido (`SUCCESS` o error). Conserva esta medición como línea base para comparar el resultado de la clase 1.2.
 
-@Readiness
-@ApplicationScoped
-public class ReadinessHealthCheck implements HealthCheck {
+### Paso 4: Laboratorio guiado: establecer la línea base
 
-    private final Random random = new Random();
-
-    @Override
-    public HealthCheckResponse call() {
-        boolean isReady = checkDatabaseCluster();
-
-        if (isReady) {
-            return HealthCheckResponse.up("catalog-database-check");
-        } else {
-            return HealthCheckResponse.down("catalog-database-check");
-        }
-    }
-
-    private boolean checkDatabaseCluster() {
-        return random.nextInt(100) >= 5;
-    }
-}
-```
-
-### Paso 3: Simular solicitudes para medir disponibilidad básica
-
-El endpoint real del proyecto es `/v1/products`, implementado en `src/main/java/com/ecom/catalog/CatalogResource.java`. Este endpoint simula una consulta al catálogo y aplica `Timeout`, `Retry`, `CircuitBreaker` y `Fallback`.
-
-La configuración de resiliencia es:
-
-```java
-package com.ecom.catalog;
-
-import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Fallback;
-import org.eclipse.microprofile.faulttolerance.Retry;
-import org.eclipse.microprofile.faulttolerance.Timeout;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import java.util.Random;
-import java.util.logging.Logger;
-
-@Path("/v1/products")
-public class CatalogResource {
-
-    private static final Logger LOG = Logger.getLogger(CatalogResource.class.getName());
-    private final Random random = new Random();
-
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-    @Timeout(800)
-    @Retry(maxRetries = 2, delay = 150)
-    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000)
-    @Fallback(fallbackMethod = "getCatalogFallback")
-    public Response getProducts() throws InterruptedException {
-        int chance = random.nextInt(10);
-
-        if (chance < 2) {
-            LOG.warning("Simulando latencia alta en consulta de catálogo...");
-            Thread.sleep(1200);
-        }
-
-        if (chance >= 2 && chance < 5) {
-            LOG.severe("Falla de conexión a la base de datos primaria.");
-            throw new RuntimeException("Database connection timeout");
-        }
-
-        return Response.ok("{\"status\":\"SUCCESS\",\"data\":[\"Product A\",\"Product B\",\"Product C\"]}").build();
-    }
-
-    public Response getCatalogFallback() {
-        return Response.ok("{\"status\":\"DEGRADED_CACHE\",\"data\":[\"Cached Product A\",\"Cached Product B\"]}").build();
-    }
-}
-```
-
-### Paso 4: Laboratorio guiado: observar disponibilidad y degradación
-
-En esta práctica trabajarás con varias terminales para relacionar la solicitud del cliente, los _logs_ de Quarkus, el estado de salud y la respuesta entregada. No cierres ninguna terminal hasta terminar.
+En esta práctica trabajarás con varias terminales para relacionar la solicitud del cliente, los _logs_ de Quarkus, el estado de salud y la respuesta entregada antes de añadir resiliencia. No cierres ninguna terminal hasta terminar.
 
 #### Terminal 1: iniciar el servicio y observar los _logs_
 
@@ -215,7 +132,7 @@ Deja esta terminal visible. Cada mensaje permitirá relacionar lo que sucede int
 - `Catálogo retornado exitosamente desde la base de datos primaria.`: respuesta `SUCCESS`.
 - `Simulando latencia alta en consulta de catálogo...`: escenario que puede activar `Timeout` y `Fallback`.
 - `Falla de conexión a la base de datos primaria.`: fallo de la dependencia.
-- `Fallback activado: Sirviendo datos desde la memoria caché local.`: respuesta `DEGRADED_CACHE`.
+- En esta línea base no debe aparecer un log de `Fallback`, porque todavía no está implementado.
 
 #### Terminal 2: comprobar los estados de salud
 
@@ -253,11 +170,10 @@ done
 Relaciona cada línea con los _logs_ de la Terminal 1:
 
 - `SUCCESS` con el log de retorno desde la base de datos primaria.
-- `DEGRADED_CACHE` con el log de `Fallback`.
-- Una latencia cercana o superior a `0.8s` con el `Timeout` configurado en `800ms`.
-- Una respuesta `200` con `DEGRADED_CACHE` confirma que hay disponibilidad técnica, pero calidad funcional degradada.
+- Una latencia cercana a 1.2 segundos con el escenario de latencia alta.
+- Una respuesta HTTP `500` con el log de fallo de base de datos, porque todavía no existe `Retry` ni `Fallback`.
 
-Los escenarios son aleatorios. Si no aparece `DEGRADED_CACHE`, repite este bloque; el código simula latencia alta en el 20% de los intentos y fallas de conexión en el 30%, antes de que `Retry`, `CircuitBreaker` y `Fallback` determinen la respuesta final.
+Los escenarios son aleatorios. Repite este bloque para obtener una muestra representativa: el código simula latencia alta en el 20% de los intentos y fallas de conexión en el 30%. Conserva esta línea base para compararla después de implementar `Retry`, `CircuitBreaker` y `Fallback` en la clase 1.2.
 
 #### Terminal 4: guardar y clasificar una muestra
 
@@ -283,17 +199,15 @@ TOTAL=$(wc -l < availability-sample.txt | tr -d ' ')
 
 echo "Solicitudes totales: $TOTAL"
 echo "Respuestas SUCCESS: $PRIMARY"
-echo "Respuestas DEGRADED_CACHE: $DEGRADED"
+echo "Respuestas DEGRADED_CACHE: $DEGRADED (esperado: 0 en la línea base)"
 echo "Respuestas HTTP 200: $HTTP_200"
 echo "Respuestas HTTP distintas de 200: $HTTP_ERRORS"
 echo "SLI de disponibilidad: $(echo "scale=4; $HTTP_200 / $TOTAL" | bc)"
 ```
 
-#### Terminal 1 y Terminal 3: observar el circuito y la recuperación
+#### Repetir la práctica después de la clase 1.2
 
-Genera más tráfico desde la Terminal 3 y observa simultáneamente la Terminal 1. Cuando se alcance el umbral del `CircuitBreaker`, algunas solicitudes pueden ir directamente al `Fallback` durante aproximadamente cinco segundos. Después de ese intervalo, continúa enviando solicitudes y observa si vuelven a aparecer respuestas `SUCCESS` cuando la simulación de la dependencia no falla.
-
-Finalmente, interpreta los resultados: `SUCCESS` representa una respuesta normal; `DEGRADED_CACHE` representa continuidad del servicio con datos degradados; HTTP distinto de `200` representa una indisponibilidad del endpoint; y `/live` en `UP` junto con `/ready` en `DOWN` representa un proceso vivo que la aplicación no considera listo para recibir tráfico.
+Cuando hayas implementado los patrones en `CatalogResource`, repite la misma práctica. Compara la línea base con el nuevo resultado: `SUCCESS` representa una respuesta normal, `DEGRADED_CACHE` continuidad con datos degradados y una menor cantidad de errores HTTP demuestra el efecto de la resiliencia. El comportamiento del `CircuitBreaker` y la recuperación se validarán en el laboratorio integrador.
 
 ## 4. Reto de ingeniería o pregunta de reflexión
 

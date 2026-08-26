@@ -1,7 +1,7 @@
 # Proyecto Base - Unidad 1
 ## Arquitecturas de alta disponibilidad y escalabilidad
 
-Este directorio contiene el **código base funcional** para el laboratorio integrador de la Unidad 1.
+Este directorio contiene el **starter funcional** para el laboratorio integrador de la Unidad 1. El servicio compila y puede ejecutarse, pero los patrones de resiliencia se completan durante las clases y el laboratorio.
 
 ## 📦 Contenido
 
@@ -24,7 +24,7 @@ Construir, desplegar y validar una arquitectura resiliente en **Quarkus** sobre 
 | Componente | Versión | Descripción |
 |-----------|---------|-------------|
 | Java | OpenJDK 25 | Lenguaje de programación |
-| Quarkus | 3.33.0 LTS | Framework cloud-native |
+| Quarkus | 3.38.0 | Framework cloud-native |
 | Maven | 3.9.6 | Herramienta de build |
 | Docker Desktop | 24.0+ | Container runtime (incluye Docker Compose) |
 | Kubernetes | 1.28+ | Orquestador (OPCIONAL) |
@@ -68,7 +68,7 @@ El servicio estará disponible en http://localhost:8080
 ### Paso 3: Probar el servicio
 
 ```bash
-# Endpoint principal con patrones de resiliencia
+# Endpoint principal del starter
 curl http://localhost:8080/v1/products
 
 # Health checks
@@ -122,22 +122,22 @@ minikube service catalog-service-lb --url
 
 ## 📚 Relación con el Laboratorio
 
-Este código base es **100% funcional** y está alineado con [laboratorio-1.md](../laboratorio-1.md).
+Este starter es ejecutable y está alineado con [laboratorio-1.md](../laboratorio-1.md). No es la solución final: el alumno debe completar la resiliencia de la aplicación y validar su comportamiento.
 
 **El alumno trabajará con este código para:**
 
-1. ✅ Ejecutarlo localmente y comprender el funcionamiento
-2. ✅ Construir la imagen Docker
-3. ✅ Desplegarlo en Kubernetes
-4. ✅ Validar los patrones de resiliencia (Circuit Breaker, Retry, Timeout, Fallback)
-5. ✅ Observar la distribución multi-AZ con topology spread constraints
+1. ✅ Ejecutarlo localmente y establecer una línea base
+2. ✅ Implementar los patrones de resiliencia
+3. ✅ Construir la imagen Docker
+4. ✅ Desplegarlo en Kubernetes
+5. ✅ Validar los patrones de resiliencia y la distribución multi-AZ
 6. ✅ Simular fallos y verificar la recuperación automática
 7. ✅ Generar el diagrama de arquitectura del sistema desplegado
 
 **El código ya incluye:**
 
-- ✅ Patrones de tolerancia a fallos completamente funcionales
-- ✅ Health checks para Kubernetes
+- ✅ Simulación de latencia y fallos para que el alumno implemente tolerancia a fallos
+- ✅ Health check base para Kubernetes
 - ✅ Configuración de topología multi-AZ
 - ✅ Readiness y Liveness probes
 - ✅ Recursos y límites computacionales
