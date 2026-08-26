@@ -22,14 +22,14 @@ import java.util.Random;
  * Para esta unidad de aprendizaje, simulamos la disponibilidad con un 95% de
  * éxito.
  */
-@Readiness
+@Readiness // Este check se vincula al endpoint /ready.
 @ApplicationScoped
 public class ReadinessHealthCheck implements HealthCheck {
 
     private final Random random = new Random();
 
     /**
-     * Método de verificación que Kubernetes invoca periódicamente en /health/ready
+     * Método de verificación que Kubernetes invoca periódicamente en /ready
      * 
      * @return HealthCheckResponse con estado UP o DOWN
      */

@@ -70,7 +70,7 @@ spec:
           # Útil para aplicaciones que tardan en arrancar
           startupProbe:
             httpGet:
-              path: /health/ready
+              path: /ready
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 3
@@ -80,7 +80,7 @@ spec:
           # Si falla, Kubernetes reinicia el pod
           livenessProbe:
             httpGet:
-              path: /health/live
+              path: /live
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
@@ -91,7 +91,7 @@ spec:
           # Si falla, Kubernetes remueve el pod del Service (no recibe tráfico)
           readinessProbe:
             httpGet:
-              path: /health/ready
+              path: /ready
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 5
