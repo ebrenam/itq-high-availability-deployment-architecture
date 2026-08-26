@@ -67,6 +67,10 @@ Imagina la cocina de un restaurante de alta cocina con una estrella Michelin dur
 
 - **MTTR (_Mean Time to Repair_):** Si a un cocinero se le quema una guarnición, ¿cuánto tiempo toma tirarla a la basura, limpiar el sartén y volver a preparar una guarnición nueva de reemplazo? Un tiempo de respuesta bajo mantiene al restaurante funcionando sin retrasos perceptibles.
 
+- **MTTF (_Mean Time to Failure_):** Si el horno principal no se puede reparar y debe reemplazarse, ¿cuánto tiempo funciona en promedio desde que se instala hasta que falla definitivamente?
+
+- **MTBF (_Mean Time Between Failures_):** Si el horno sí se puede reparar, ¿cuánto tiempo transcurre en promedio entre una avería y la siguiente, contando el tiempo de reparación y su regreso al servicio?
+
 - **Error Budget:** Si el equipo sabe que puede fallar en el 5% de las órdenes (su SLO es 95%), tienen margen de maniobra durante la semana para probar nuevos platillos en el menú. Pero si acumulan demasiados clientes insatisfechos a principio de mes, cancelan las pruebas culinarias y se apegan estrictamente a los platillos tradicionales hasta recuperar el margen.
 
 ### Visualización: Cascada de Fallos (Dominó)
