@@ -197,30 +197,55 @@ public class CatalogResource {
 }
 ```
 
-### Paso 4: Calcular un SLI manual de disponibilidad
+### Paso 4: Observar los escenarios y calcular un SLI manual de disponibilidad
 
-Usaremos una medición simple basada en respuestas HTTP. Esto permite introducir el concepto de SLI sin depender todavía de Prometheus ni de Alertmanager.
+Usaremos una medición local basada en respuestas HTTP, contenido JSON y latencia. Así podrás distinguir entre una respuesta normal desde la base de datos primaria (`SUCCESS`) y una respuesta degradada desde la caché (`DEGRADED_CACHE`), sin depender todavía de Prometheus ni de Alertmanager.
 
-Ejecuta una ráfaga de solicitudes al endpoint real y guarda el código HTTP de cada respuesta:
+Con la aplicación ejecutándose en otra terminal, ejecuta una ráfaga de solicitudes al endpoint real. El comando guarda el número de solicitud, el código HTTP, el tiempo total y el cuerpo de cada respuesta:
 
 ```bash
 for i in {1..20}; do
-    curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/v1/products
-done > availability-sample.txt
+    response_file=$(mktemp)
+    metadata=$(curl -sS -o "$response_file" -w "%{http_code} %{time_total}" http://localhost:8080/v1/products)
+    printf '%02d %s %s\n' "$i" "$metadata" "$(cat "$response_file")"
+    rm -f "$response_file"
+done | tee availability-sample.txt
 ```
 
-Cuenta cuántas respuestas fueron exitosas (`200`) y cuántas fallaron:
+El resultado tendrá una forma similar a esta:
+
+```text
+01 200 0.012345 {"status":"SUCCESS","data":["Product A","Product B","Product C"]}
+02 200 0.801234 {"status":"DEGRADED_CACHE","data":["Cached Product A","Cached Product B"]}
+```
+
+Cuenta los escenarios observables y las respuestas HTTP:
 
 ```bash
-SUCCESS=$(grep -c '^200$' availability-sample.txt)
-TOTAL=$(wc -l < availability-sample.txt)
+PRIMARY=$(grep -c '"status":"SUCCESS"' availability-sample.txt || true)
+DEGRADED=$(grep -c '"status":"DEGRADED_CACHE"' availability-sample.txt || true)
+HTTP_200=$(grep -cE '^[0-9]+ 200 ' availability-sample.txt || true)
+HTTP_ERRORS=$(grep -cEv '^[0-9]+ 200 ' availability-sample.txt || true)
+TOTAL=$(wc -l < availability-sample.txt | tr -d ' ')
 
-echo "scale=4; $SUCCESS / $TOTAL" | bc
+echo "Solicitudes totales: $TOTAL"
+echo "Respuestas SUCCESS: $PRIMARY"
+echo "Respuestas DEGRADED_CACHE: $DEGRADED"
+echo "Respuestas HTTP 200: $HTTP_200"
+echo "Respuestas HTTP distintas de 200: $HTTP_ERRORS"
+echo "SLI de disponibilidad: $(echo "scale=4; $HTTP_200 / $TOTAL" | bc)"
 ```
 
-El resultado representa una aproximación simple del SLI de disponibilidad para esa ventana de observación. En este proyecto, el `Fallback` también devuelve HTTP `200` con el estado `DEGRADED_CACHE`; por eso, este cálculo mide si el endpoint estuvo disponible, no si siempre respondió desde la base de datos primaria.
+Interpreta los resultados de esta manera:
 
-### Paso 5: Despliegue y verificación
+- `SUCCESS`: la consulta simulada terminó correctamente en la base de datos primaria.
+- `DEGRADED_CACHE`: se activó el `Fallback` por latencia, fallas, reintentos agotados o circuito abierto; el servicio siguió disponible, pero con datos degradados.
+- HTTP distinto de `200`: el endpoint no entregó una respuesta disponible para el usuario.
+- `HTTP 200` no significa necesariamente `SUCCESS`: en este proyecto el `Fallback` también responde `200`. Por eso se cuentan por separado disponibilidad técnica y calidad funcional.
+
+Los escenarios son aleatorios: una sola ejecución no garantiza observar todos los casos. Repite la ráfaga si no aparece `DEGRADED_CACHE`; el código simula latencia alta en el 20% de los intentos y fallas de conexión en el 30%, aunque `Retry`, `CircuitBreaker` y `Fallback` modifican lo que finalmente observa el cliente.
+
+### Paso 5: Verificar salud, degradación y recuperación
 
 1. Inicia la aplicación en modo desarrollo:
 
@@ -229,24 +254,39 @@ El resultado representa una aproximación simple del SLI de disponibilidad para 
     ./mvnw quarkus:dev
     ```
 
-2. Revisa el endpoint de salud (_Health Check_):
+2. Revisa los tres endpoints de salud configurados por el proyecto:
 
     ```bash
+    curl -i http://localhost:8080/health
     curl -i http://localhost:8080/ready
+    curl -i http://localhost:8080/live
     ```
 
-3. Genera tráfico sobre la API para producir resultados medibles:
+    `/health` muestra el estado general, `/ready` indica si el servicio está listo para recibir tráfico y `/live` indica si el proceso está vivo. La comprobación de _readiness_ simula una disponibilidad del 95%, por lo que conviene repetir `/ready` varias veces para observar respuestas `UP` y ocasionalmente `DOWN`.
+
+3. Genera tráfico sobre la API y observa en la respuesta los estados `SUCCESS` y `DEGRADED_CACHE`:
 
     ```bash
-    for i in {1..20}; do curl -s http://localhost:8080/v1/products; echo ""; done
+    for i in {1..20}; do
+        curl -sS -w ' | HTTP %{http_code} | tiempo %{time_total}s\n' http://localhost:8080/v1/products
+    done
     ```
 
-4. Calcula la proporción de respuestas exitosas:
+4. Para relacionar el resultado con la causa, revisa la terminal donde corre Quarkus. Busca estos mensajes:
+
+    - `Catálogo retornado exitosamente desde la base de datos primaria.`: respuesta `SUCCESS`.
+    - `Simulando latencia alta en consulta de catálogo...`: escenario de timeout simulado.
+    - `Falla de conexión a la base de datos primaria.`: fallo de dependencia.
+    - `Fallback activado: Sirviendo datos desde la memoria caché local.`: respuesta `DEGRADED_CACHE`.
+
+5. Repite el tráfico después de cinco segundos. El `CircuitBreaker` permanece abierto durante ese intervalo cuando alcanza su umbral; durante ese periodo las solicitudes pueden ir directamente al `Fallback`. Después, nuevas solicitudes permiten observar si el servicio vuelve a `SUCCESS` cuando la simulación de la dependencia se recupera.
+
+6. Calcula la proporción de disponibilidad con el archivo generado en el paso anterior:
 
     ```bash
-    SUCCESS=$(grep -c '^200$' availability-sample.txt)
-    TOTAL=$(wc -l < availability-sample.txt)
-    echo "Solicitudes exitosas: $SUCCESS de $TOTAL"
+    HTTP_200=$(grep -cE '^[0-9]+ 200 ' availability-sample.txt || true)
+    TOTAL=$(wc -l < availability-sample.txt | tr -d ' ')
+    echo "Solicitudes disponibles: $HTTP_200 de $TOTAL"
     ```
 
 ## 4. Reto de ingeniería o pregunta de reflexión
