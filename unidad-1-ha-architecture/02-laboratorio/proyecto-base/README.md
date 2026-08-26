@@ -5,7 +5,7 @@ Este directorio contiene el **código base funcional** para el laboratorio integ
 
 ## 📦 Contenido
 
-```
+```text
 proyecto-base/
 └── catalog-service/          # Servicio de catálogo con patrones de resiliencia
     ├── src/                  # Código fuente Java/Quarkus
@@ -72,9 +72,10 @@ El servicio estará disponible en http://localhost:8080
 curl http://localhost:8080/v1/products
 
 # Health checks
-curl http://localhost:8080/health/ready
-curl http://localhost:8080/health/live
+curl http://localhost:8080/ready
+curl http://localhost:8080/live
 ```
+
 a: Ejecutar con Docker Compose (Recomendado - No requiere K8s)
 
 **Ideal para Windows con Docker Desktop:**
@@ -134,6 +135,7 @@ Este código base es **100% funcional** y está alineado con [laboratorio-1.md](
 7. ✅ Generar el diagrama de arquitectura del sistema desplegado
 
 **El código ya incluye:**
+
 - ✅ Patrones de tolerancia a fallos completamente funcionales
 - ✅ Health checks para Kubernetes
 - ✅ Configuración de topología multi-AZ
@@ -165,6 +167,7 @@ kubectl apply --dry-run=client -f k8s/
 ## 📖 Estructura del Código
 
 ### CatalogResource.java
+
 Endpoint REST principal que implementa:
 - `@Timeout(800)`: Timeout de 800ms
 - `@Retry(maxRetries = 2, delay = 150)`: 2 reintentos con 150ms de pausa
@@ -172,9 +175,11 @@ Endpoint REST principal que implementa:
 - `@Fallback(fallbackMethod = "getCatalogFallback")`: Método de respaldo
 
 ### ReadinessHealthCheck.java
+
 Health check personalizado que simula validación de conectividad a base de datos con 95% de disponibilidad.
 
 ### Deployment (01-deployment.yaml)
+
 - 3 réplicas para alta disponibilidad
 - Topology spread constraints para distribución multi-AZ
 - Startup, Liveness y Readiness probes
@@ -182,6 +187,7 @@ Health check personalizado que simula validación de conectividad a base de dato
 - Security context no-root
 
 ### Service (02-service.yaml)
+
 LoadBalancer que expone el puerto 80 y mapea al 8080 del contenedor.
 
 ## 🎓 Actividades del Laboratorio
@@ -198,6 +204,7 @@ El alumno deberá completar las siguientes actividades según [laboratorio-1.md]
 ## 🐛 Troubleshooting Común
 
 ### Maven Wrapper no funciona
+
 ```bash
 # Dar permisos de ejecución
 chmod +x mvnw
@@ -207,6 +214,7 @@ mvn quarkus:dev
 ```
 
 ### Error "ImagePullBackOff" en Kubernetes
+
 ```bash
 # Asegúrate de construir la imagen en el contexto de Minikube
 eval $(minikube docker-env)
@@ -214,6 +222,7 @@ docker build -t catalog-service:1.0.0 .
 ```
 
 ### Pods no se distribuyen en múltiples zonas
+
 ```bash
 # Minikube por defecto solo tiene 1 nodo
 # Para simular multi-AZ, etiqueta el nodo:
@@ -223,6 +232,7 @@ kubectl label nodes minikube topology.kubernetes.io/zone=zone-a
 ## 📞 Soporte
 
 Para dudas o problemas:
+
 1. Consulta el [README.md del servicio](catalog-service/README.md)
 2. Revisa el [laboratorio-1.md](../laboratorio-1.md)
 3. Contacta al instructor

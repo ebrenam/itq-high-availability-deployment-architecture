@@ -32,7 +32,7 @@ A nivel de 6° semestre de Ingeniería en Sistemas Computacionales, estos son lo
 
 - **Git:** Clonado de repositorios (`git clone`), navegación por ramas (`git checkout`), gestión de versiones (`git pull`, `git status`) y etiquetado (`git tag`).
 
-- **Entorno de desarrollo (IDE):** VS Code, IntelliJ IDEA o Eclipse configurado con JDK 17+ y plugins para Java/Docker.
+- **Entorno de desarrollo (IDE):** VS Code, IntelliJ IDEA o Eclipse configurado con JDK 25 y plugins para Java/Docker.
 
 **Evaluación diagnóstica rápida (Checklist de entrada)**
 

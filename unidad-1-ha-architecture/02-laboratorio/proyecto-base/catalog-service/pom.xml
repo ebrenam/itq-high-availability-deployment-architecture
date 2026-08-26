@@ -36,7 +36,7 @@
         <!-- Quarkus RESTEasy Reactive with Jackson support for JSON -->
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-resteasy-reactive-jackson</artifactId>
+            <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
         
         <!-- SmallRye Health for Kubernetes probes -->

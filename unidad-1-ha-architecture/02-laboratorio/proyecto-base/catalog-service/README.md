@@ -23,7 +23,7 @@ Este microservicio implementa el catálogo de productos con patrones de resilien
 
 ## 📁 Estructura del Proyecto
 
-```
+```text
 catalog-service/
 ├── pom.xml                           # Configuración de Maven y dependencias
 ├── Dockerfile                        # Imagen Docker multi-stage
@@ -52,15 +52,19 @@ catalog-service/
 # Modo desarrollo con hot reload
 ./mvnw quarkus:dev
 
+# Windows (PowerShell o CMD)
+mvnw.cmd quarkus:dev
+
 # O si no tienes Maven wrapper
 mvn quarkus:dev
 ```
 
 El servicio estará disponible en:
+
 - **API**: http://localhost:8080/v1/products
 - **Health**: http://localhost:8080/health
-- **Readiness**: http://localhost:8080/health/ready
-- **Liveness**: http://localhost:8080/health/live
+- **Readiness**: http://localhost:8080/ready
+- **Liveness**: http://localhost:8080/live
 
 ### Probar el endpoint
 
@@ -73,8 +77,8 @@ curl http://localhost:8080/v1/products/hello
 
 # Health checks
 curl http://localhost:8080/health
-curl http://localhost:8080/health/ready
-curl http://localhost:8080/health/live
+curl http://localhost:8080/ready
+curl http://localhost:8080/live
 ```
 
 ## 🐳 Construcción de la Imagen Docker
@@ -234,10 +238,10 @@ done
 
 ```bash
 # Readiness probe (usado por Kubernetes para balanceo de carga)
-curl http://localhost:8080/health/ready
+curl http://localhost:8080/ready
 
 # Liveness probe (usado por Kubernetes para reiniciar pods)
-curl http://localhost:8080/health/live
+curl http://localhost:8080/live
 
 # Health check completo
 curl http://localhost:8080/health | jq

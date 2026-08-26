@@ -23,3 +23,25 @@
 hs_err_pid*
 replay_pid*
 .DS_Store
+
+# Se habilita de forma temporal para evitar subir material de unidad aún no validada
+unidad-2-kubernetes/clase-2-1.md
+unidad-2-kubernetes/clase-2-2.md
+unidad-2-kubernetes/clase-2-3.md
+unidad-2-kubernetes/laboratorio-2.md
+unidad-2-kubernetes/README.md
+unidad-3-networks/clase-3-1.md
+unidad-3-networks/clase-3-2.md
+unidad-3-networks/clase-3-3.md
+unidad-3-networks/laboratorio-3.md
+unidad-3-networks/README.md
+unidad-4-ci-cd/clase-4-1.md
+unidad-4-ci-cd/clase-4-2.md
+unidad-4-ci-cd/clase-4-3.md
+unidad-4-ci-cd/laboratorio-4.md
+unidad-4-ci-cd/README.md
+unidad-5-observability/clase-5-1.md
+unidad-5-observability/clase-5-2.md
+unidad-5-observability/clase-5-3.md
+unidad-5-observability/laboratorio-5.md
+unidad-5-observability/README.md

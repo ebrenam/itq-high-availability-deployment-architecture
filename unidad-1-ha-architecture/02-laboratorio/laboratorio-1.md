@@ -10,7 +10,7 @@
 
 Antes de iniciar, debes contar con las siguientes herramientas instaladas y funcionales en tu entorno de desarrollo Linux/macOS:
 
-- **Java OpenJDK 17+** y **Apache Maven 3.8+**.
+- **Java OpenJDK 25** y **Apache Maven 3.8+**.
 
 - **Docker Engine** (v24.0+) o **Podman**.
 
