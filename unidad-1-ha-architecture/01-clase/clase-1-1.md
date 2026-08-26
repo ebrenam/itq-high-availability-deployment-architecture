@@ -55,6 +55,8 @@ $$\text{Disponibilidad} = \frac{\text{MTBF}}{\text{MTBF} + \text{MTTR}} \times 1
 
 ![disponibilidad](images/image-1-2.jpeg)
 
+## 2. Analogía del mundo real
+
 Imagina la cocina de un restaurante de alta cocina con una estrella Michelin durante la hora pico de un viernes.
 
 - **SPOF (Punto único de fallo):** Hay un solo chef principal que supervisa la parrilla. Si se corta un dedo o se desmaya, toda la cocina se detiene por completo. Para evitar esto, se necesita un sistema con un _chef de respaldo_ (_active-passive_) o múltiples estaciones de parrilla funcionando simultáneamente (_active-active_).
@@ -77,114 +79,120 @@ Imagina la cocina de un restaurante de alta cocina con una estrella Michelin dur
 
 ![domino](images/image-1-3.jpeg)
 
-## 2. Analogía del mundo real
+## 3. Desglose técnico paso a paso
 
-Para afianzar cómo aterrizamos los fundamentos de confiabilidad en código Java utilizando el framework **Quarkus**, construiremos un _health check_ y una medición básica de disponibilidad sin depender todavía de una plataforma completa de observabilidad.
+Para afianzar cómo aterrizamos los fundamentos de confiabilidad en código Java utilizando el framework **Quarkus**, trabajaremos con el proyecto base `catalog-service` del laboratorio. El proyecto ya incluye un _health check_, patrones de tolerancia a fallos y endpoints para medir la disponibilidad sin depender todavía de una plataforma completa de observabilidad.
 
 ### Paso 1: Configurar la aplicación Quarkus
 
-En un proyecto Quarkus existente, asegurémonos de incluir las extensiones de observabilidad mediante el archivo `pom.xml`:
+Desde el directorio `Unidad-1-ha-architecture/02-laboratorio/proyecto-base/catalog-service`, las dependencias principales del archivo `pom.xml` son:
 
 ```xml
 <dependencies>
-    <!-- Extensión para Health Checks estándar (SmallRye Health) -->
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-rest-jackson</artifactId>
+    </dependency>
     <dependency>
         <groupId>io.quarkus</groupId>
         <artifactId>quarkus-smallrye-health</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-smallrye-fault-tolerance</artifactId>
     </dependency>
 </dependencies>
 ```
 
 ### Paso 2: Crear un indicador de disponibilidad personalizado (_Health Check_)
 
-Implementaremos una comprobación de estado para determinar la disponibilidad (_readiness probe_) simulando la conectividad de nuestro microservicio.
+El proyecto contiene la clase `src/main/java/com/ecom/catalog/ReadinessHealthCheck.java`. Esta comprobación simula la conectividad del clúster de base de datos y devuelve `UP` el 95% de las veces, o `DOWN` el 5% restante.
 
-Crea el archivo `src/main/java/org/acme/reliability/DatabaseReadinessCheck.java`:
+El código central de la clase es:
 
 ```java
-package org.acme.reliability;
+package com.ecom.catalog;
 
 import org.eclipse.microprofile.health.HealthCheck;
 import org.eclipse.microprofile.health.HealthCheckResponse;
-import org.eclipse.microprofile.health.HealthCheckResponseBuilder;
 import org.eclipse.microprofile.health.Readiness;
 import jakarta.enterprise.context.ApplicationScoped;
+import java.util.Random;
 
 @Readiness
 @ApplicationScoped
-public class DatabaseReadinessCheck implements HealthCheck {
+public class ReadinessHealthCheck implements HealthCheck {
+
+    private final Random random = new Random();
 
     @Override
     public HealthCheckResponse call() {
-        HealthCheckResponseBuilder responseBuilder = HealthCheckResponse.named("Database connection readiness");
+        boolean isReady = checkDatabaseCluster();
 
-        try {
-            // Simulación de verificación de conectividad a la base de datos
-            boolean databaseUp = checkDatabaseConnection();
-
-            if (databaseUp) {
-                return responseBuilder.up()
-                        .withData("latency_ms", 12)
-                        .withData("active_connections", 8)
-                        .build();
-            } else {
-                return responseBuilder.down()
-                        .withData("error", "Timeout connecting to DB pool")
-                        .build();
-            }
-        } catch (Exception e) {
-            return responseBuilder.down().withData("error", e.getMessage()).build();
+        if (isReady) {
+            return HealthCheckResponse.up("catalog-database-check");
+        } else {
+            return HealthCheckResponse.down("catalog-database-check");
         }
     }
 
-    private boolean checkDatabaseConnection() {
-        // En un entorno real, ejecutaría un "SELECT 1" rápido sobre el datasource
-        return true; 
+    private boolean checkDatabaseCluster() {
+        return random.nextInt(100) >= 5;
     }
 }
 ```
 
 ### Paso 3: Simular solicitudes para medir disponibilidad básica
 
-En esta unidad no necesitamos una plataforma completa de observabilidad. Nos basta con generar respuestas exitosas y fallidas para estimar manualmente un SLI de disponibilidad.
+El endpoint real del proyecto es `/v1/products`, implementado en `src/main/java/com/ecom/catalog/CatalogResource.java`. Este endpoint simula una consulta al catálogo y aplica `Timeout`, `Retry`, `CircuitBreaker` y `Fallback`.
 
-Crea la clase REST `src/main/java/org/acme/reliability/OrderResource.java`:
+La configuración de resiliencia es:
 
 ```java
-package org.acme.reliability;
+package com.ecom.catalog;
 
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Fallback;
+import org.eclipse.microprofile.faulttolerance.Retry;
+import org.eclipse.microprofile.faulttolerance.Timeout;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.Random;
+import java.util.logging.Logger;
 
-@Path("/v1/orders")
-public class OrderResource {
+@Path("/v1/products")
+public class CatalogResource {
 
+    private static final Logger LOG = Logger.getLogger(CatalogResource.class.getName());
     private final Random random = new Random();
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public Response processOrder() {
-        try {
-            // Simular latencia variable
-            int latency = random.nextInt(300);
-            Thread.sleep(latency);
+    @Timeout(800)
+    @Retry(maxRetries = 2, delay = 150)
+    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000)
+    @Fallback(fallbackMethod = "getCatalogFallback")
+    public Response getProducts() throws InterruptedException {
+        int chance = random.nextInt(10);
 
-            // Simular una tasa de error inducida del 5%
-            if (random.nextInt(100) < 5) {
-                return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                        .entity("{\"error\": \"Order processing failed\"}").build();
-            }
-
-            return Response.ok("{\"status\": \"Order processed successfully\"}").build();
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return Response.serverError().build();
+        if (chance < 2) {
+            LOG.warning("Simulando latencia alta en consulta de catálogo...");
+            Thread.sleep(1200);
         }
+
+        if (chance >= 2 && chance < 5) {
+            LOG.severe("Falla de conexión a la base de datos primaria.");
+            throw new RuntimeException("Database connection timeout");
+        }
+
+        return Response.ok("{\"status\":\"SUCCESS\",\"data\":[\"Product A\",\"Product B\",\"Product C\"]}").build();
+    }
+
+    public Response getCatalogFallback() {
+        return Response.ok("{\"status\":\"DEGRADED_CACHE\",\"data\":[\"Cached Product A\",\"Cached Product B\"]}").build();
     }
 }
 ```
@@ -193,11 +201,11 @@ public class OrderResource {
 
 Usaremos una medición simple basada en respuestas HTTP. Esto permite introducir el concepto de SLI sin depender todavía de Prometheus ni de Alertmanager.
 
-Ejecuta una ráfaga de solicitudes y guarda el código HTTP de cada respuesta:
+Ejecuta una ráfaga de solicitudes al endpoint real y guarda el código HTTP de cada respuesta:
 
 ```bash
 for i in {1..20}; do
-    curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/v1/orders
+    curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/v1/products
 done > availability-sample.txt
 ```
 
@@ -210,26 +218,27 @@ TOTAL=$(wc -l < availability-sample.txt)
 echo "scale=4; $SUCCESS / $TOTAL" | bc
 ```
 
-El resultado representa una aproximación simple del SLI de disponibilidad para esa ventana de observación.
+El resultado representa una aproximación simple del SLI de disponibilidad para esa ventana de observación. En este proyecto, el `Fallback` también devuelve HTTP `200` con el estado `DEGRADED_CACHE`; por eso, este cálculo mide si el endpoint estuvo disponible, no si siempre respondió desde la base de datos primaria.
 
 ### Paso 5: Despliegue y verificación
 
 1. Inicia la aplicación en modo desarrollo:
 
     ```bash
+    cd Unidad-1-ha-architecture/02-laboratorio/proyecto-base/catalog-service
     ./mvnw quarkus:dev
     ```
 
 2. Revisa el endpoint de salud (_Health Check_):
 
     ```bash
-    curl -i http://localhost:8080/q/health/ready
+    curl -i http://localhost:8080/ready
     ```
 
 3. Genera tráfico sobre la API para producir resultados medibles:
 
     ```bash
-    for i in {1..20}; do curl -s http://localhost:8080/v1/orders; echo ""; done
+    for i in {1..20}; do curl -s http://localhost:8080/v1/products; echo ""; done
     ```
 
 4. Calcula la proporción de respuestas exitosas:
