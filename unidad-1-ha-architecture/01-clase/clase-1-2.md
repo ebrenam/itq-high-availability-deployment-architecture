@@ -14,13 +14,13 @@ Para evitar que una falla local destruya el sistema completo, implementamos dos 
 
 #### Circuit Breaker: Máquina de Estados
 
-![circuit](image-2-1.jpeg)
+![circuit](images/image-2-1.jpeg)
 
 - **Retry con _exponential backoff_ y _jitter_:** Reintenta operaciones fallidas de forma automática. Para no saturar un servicio que apenas se está recuperando de una caída (_retry storm_), se aplica un tiempo de espera exponencial entre reintentos (_exponential backoff_) sumado a un factor aleatorio (_jitter_) que desincroniza las peticiones concurrentes.
 
 #### Retry: Backoff Exponencial
 
-![backoff](image-2-2.jpeg)
+![backoff](images/image-2-2.jpeg)
 
 - **Rate limiting:** Limita la cantidad de peticiones que un cliente o microservicio puede realizar en una ventana de tiempo específica. Protege la infraestructura contra picos de tráfico inesperados, ataques de denegación de servicio (_DoS_) y garantiza un consumo justo de recursos.
 
@@ -28,7 +28,7 @@ Para evitar que una falla local destruya el sistema completo, implementamos dos 
 
 #### Bulkhead: Thread Pools Aislados
 
-![backoff](image-2-3.jpeg)
+![backoff](images/image-2-3.jpeg)
 
 - **Fallback:** Proporciona una ruta alternativa de degradación elegante (_graceful degradation_) cuando falla la llamada principal (por ejemplo, devolver datos guardados en caché o un valor por defecto seguro).
 
@@ -48,7 +48,7 @@ El _load balancing_ es fundamental para distribuir las solicitudes entre múltip
 
 #### Load Balancing: Estrategias
 
-![balancing](image-2-4.jpeg)
+![balancing](images/image-2-4.jpeg)
 
 ## 2. Analogía del mundo real
 

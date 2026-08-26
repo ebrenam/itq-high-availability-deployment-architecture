@@ -18,7 +18,7 @@ Los proveedores de nube pública estructuran su infraestructura global en tres n
 
 #### Jerarquía: Región → AZs → Data Centers
 
-![region](image-3-1.jpeg)
+![region](images/image-3-1.jpeg)
 
 #### Estrategias de despliegue: Multi-AZ vs. Multi-Región
 
@@ -30,7 +30,7 @@ Los proveedores de nube pública estructuran su infraestructura global en tres n
 
 #### Single-AZ vs. Multi-AZ Comparación Visual
 
-![single-multi](image-3-2.jpeg)
+![single-multi](images/image-3-2.jpeg)
 
 #### Componentes clave a nivel de red e infraestructura Cloud-Native
 
@@ -42,7 +42,7 @@ Los proveedores de nube pública estructuran su infraestructura global en tres n
 
 #### VPC y Subredes
 
-![vpc](image-3-3.jpeg)
+![vpc](images/image-3-3.jpeg)
 
 ### 2. Analogía del mundo real
 
@@ -104,7 +104,7 @@ spec:
 
 #### Topology Spread Constraints: Distribución de Pods
 
-![topology](image-3-4.jpeg)
+![topology](images/image-3-4.jpeg)
 
 El parámetro `maxSkew: 1` significa que la diferencia máxima de pods distribuidos entre AZs es de 1. Por ejemplo, si tenemos 6 replicas, cada AZ tendrá exactamente 2 pods. Si tenemos 7 replicas, dos AZs tendrán 2 pods y una AZ tendrá 3 pods (diferencia máxima = 1).
 

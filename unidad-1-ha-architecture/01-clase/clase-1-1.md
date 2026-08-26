@@ -49,11 +49,11 @@ $$\text{Disponibilidad} = \frac{\text{MTBF}}{\text{MTBF} + \text{MTTR}} \times 1
 
 ### Visualización: Relación entre SLI, SLO y SLA
 
-![services](image-1-1.jpeg)
+![services](images/image-1-1.jpeg)
 
 ### Visualización: Componentes de Disponibilidad
 
-![disponibilidad](image-1-2.jpeg)
+![disponibilidad](images/image-1-2.jpeg)
 
 Imagina la cocina de un restaurante de alta cocina con una estrella Michelin durante la hora pico de un viernes.
 
@@ -71,7 +71,7 @@ Imagina la cocina de un restaurante de alta cocina con una estrella Michelin dur
 
 ### Visualización: Cascada de Fallos (Dominó)
 
-![domino](image-1-3.jpeg)
+![domino](images/image-1-3.jpeg)
 
 ## 2. Analogía del mundo real
 
