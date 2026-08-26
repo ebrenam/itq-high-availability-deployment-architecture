@@ -237,7 +237,7 @@ for i in {1..20}; do
 done
 ```
 
-Busca respuestas `UP` y, eventualmente, `DOWN`. Un `DOWN` en `/ready` significa que Kubernetes debería retirar temporalmente el _Pod_ del tráfico; no significa necesariamente que el proceso haya muerto, porque `/live` puede continuar en `UP`.
+Busca respuestas `UP` y, eventualmente, `DOWN`. En esta práctica local, un `DOWN` en `/ready` significa que la aplicación no se considera lista para recibir tráfico; no significa necesariamente que el proceso haya muerto, porque `/live` puede continuar en `UP`. La forma en que Kubernetes usa esta información se revisará más adelante, al desplegar el servicio.
 
 #### Terminal 3: generar tráfico y ver la respuesta en tiempo real
 
@@ -293,7 +293,7 @@ echo "SLI de disponibilidad: $(echo "scale=4; $HTTP_200 / $TOTAL" | bc)"
 
 Genera más tráfico desde la Terminal 3 y observa simultáneamente la Terminal 1. Cuando se alcance el umbral del `CircuitBreaker`, algunas solicitudes pueden ir directamente al `Fallback` durante aproximadamente cinco segundos. Después de ese intervalo, continúa enviando solicitudes y observa si vuelven a aparecer respuestas `SUCCESS` cuando la simulación de la dependencia no falla.
 
-Finalmente, interpreta los resultados: `SUCCESS` representa una respuesta normal; `DEGRADED_CACHE` representa continuidad del servicio con datos degradados; HTTP distinto de `200` representa una indisponibilidad del endpoint; y `/live` en `UP` junto con `/ready` en `DOWN` representa un proceso vivo que no debe recibir tráfico temporalmente.
+Finalmente, interpreta los resultados: `SUCCESS` representa una respuesta normal; `DEGRADED_CACHE` representa continuidad del servicio con datos degradados; HTTP distinto de `200` representa una indisponibilidad del endpoint; y `/live` en `UP` junto con `/ready` en `DOWN` representa un proceso vivo que la aplicación no considera listo para recibir tráfico.
 
 ## 4. Reto de ingeniería o pregunta de reflexión
 
