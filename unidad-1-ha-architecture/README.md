@@ -99,7 +99,7 @@
 
 ## Punto de partida recomendado
 
-La unidad debe iniciar con `u1-starter`: una base mínima funcional de la plataforma e-commerce con el esqueleto del sistema y un primer servicio operativo (`catalog-service`). Ver [02-laboratorio/proyecto-base](02-laboratorio/proyecto-base) y [02-laboratorio/laboratorio-1.md](02-laboratorio/laboratorio-1.md). El resultado final de esta unidad se convierte en el starter de la Unidad 2.
+La unidad debe iniciar con `u1-starter` como nombre conceptual del estado inicial del proyecto: una base mínima funcional de la plataforma e-commerce con el esqueleto del sistema y un primer servicio operativo (`catalog-service`). En el repositorio, esa base se materializa en [02-laboratorio/proyecto-base](02-laboratorio/proyecto-base), que es el directorio real del starter. Ver también [02-laboratorio/laboratorio-1.md](02-laboratorio/laboratorio-1.md). El resultado final de esta unidad se convierte en el starter de la Unidad 2.
 
 **Flujo pedagógico:**
 1. **Semanas 1-2:** Clases teóricas (1.1, 1.2, 1.3) establecen conceptos
