@@ -3,17 +3,17 @@
 ## Estructura de la Unidad
 
 ```text
-01-clase/                    # Clases teóricas
-├── clase-1-1.md           # Fundamentos de disponibilidad y confiabilidad
-├── clase-1-2.md           # Patrones de diseño para resiliencia
-└── clase-1-3.md           # Despliegue en la nube y zonas de disponibilidad
-
-02-laboratorio/            # Laboratorio con proyecto funcional
-├── laboratorio-1.md       # Especificación del laboratorio integrador
-├── laboratorio-clase-1-1.md # Línea base de disponibilidad
-├── laboratorio-clase-1-2.md # Patrones de resiliencia
-├── laboratorio-clase-1-3.md # Despliegue y autocuración
-└── proyecto-base/         # Código base (catalog-service)
+01-clase/                     # Clases teóricas
+├── clase-1-1.md              # Fundamentos de disponibilidad y confiabilidad
+├── clase-1-2.md              # Patrones de diseño para resiliencia
+└── clase-1-3.md              # Despliegue en la nube y zonas de disponibilidad
+   
+02-laboratorio/               # Laboratorio con proyecto funcional
+├── laboratorio-1.md          # Especificación del laboratorio integrador
+├── laboratorio-clase-1-1.md  # Línea base de disponibilidad
+├── laboratorio-clase-1-2.md  # Patrones de resiliencia
+├── laboratorio-clase-1-3.md  # Despliegue y autocuración
+└── proyecto-base/            # Código base (catalog-service)
     ├── desplegar.sh
     ├── docker-compose.yml
     ├── validar.sh
