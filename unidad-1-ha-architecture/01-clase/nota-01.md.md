@@ -35,6 +35,8 @@ Subir de 2 nueves a 3 nueves implica cambios arquitectónicos importantes:
     
 - **Mantenimiento sin interrupción (_Zero-downtime deployments_):** Despliegues tipo _Rolling updates_ o _Blue-Green_ para no pausar el servicio durante actualizaciones.
 
+---
+
 ## ¿Cómo  medir?
 
 Para una arquitectura de microservicios REST (por ejemplo, un servicio de órdenes/pagos `order-service`), así es como se definen y calculan en la práctica cada una de estas métricas:
