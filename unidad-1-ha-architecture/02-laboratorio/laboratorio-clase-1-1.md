@@ -46,7 +46,7 @@ Trabaja desde `02-laboratorio/proyecto-base-unidad-01/catalog-service`. Este pro
 
 ## Paso 1: Ejecutar la aplicación
 
-### ![linux](images/linux.png) Para Linux/macOS
+### ![linux](images/linux.png) Instrucciones para Linux/macOS
 
 En la Terminal 1:
 
@@ -63,7 +63,9 @@ En la Terminal 2, confirma que el endpoint responde:
 curl -i http://localhost:8080/v1/products
 ```
 
-### ![win](images/windows.png) Para Windows
+---
+
+### ![win](images/windows.png) Instrucciones para Windows
 
 En la Terminal 1 (PowerShell o CMD):
 
@@ -88,12 +90,16 @@ curl -i http://localhost:8080/v1/products
 > Invoke-WebRequest -Uri http://localhost:8080/v1/products -Headers @{"User-Agent"="PowerShell"}
 > ```
 
+---
+
+### Consideraciones
+
 > **⚠️ Nota Importante:** Este endpoint puede responder de dos formas:
 > - **HTTP 200 + JSON `SUCCESS`:** La solicitud fue exitosa (50% de probabilidad)
 > - **HTTP 500 + RuntimeException:** Simulación de falla de BD (30% de probabilidad)
 > - **Latencia alta (1200ms):** Simulación de congestión de BD (20% de probabilidad)
 >
-> **Es completamente normal** ver errores en algunas solicitudes. El servicio está simulando intencionalmente estos fallos para que midas su disponibilidad real sin patrones de resiliencia. En el **Paso 3**, ejecutarás 40 solicitudes consecutivas para captar esta distribución estadística completa.
+**Es completamente normal** ver errores en algunas solicitudes. El servicio está simulando intencionalmente estos fallos para que midas su disponibilidad real sin patrones de resiliencia. En el **Paso 3**, ejecutarás 40 solicitudes consecutivas para captar esta distribución estadística completa.
 
 ## Paso 2: Revisar salud
 
@@ -107,7 +113,7 @@ Registra si cada endpoint responde `UP` o `DOWN`. En esta etapa, `/ready` simula
 
 ## Paso 3: Medir la línea base
 
-### ![linux](images/linux.png) Para Linux/macOS
+### ![linux](images/linux.png) Instrucciones para Linux/macOS
 
 Ejecuta una muestra de 40 solicitudes:
 
@@ -136,7 +142,9 @@ echo "Respuestas HTTP distintas de 200: $HTTP_ERRORS"
 echo "Disponibilidad observada: $(echo "scale=4; $HTTP_200 / $TOTAL" | bc)"
 ```
 
-### ![win](images/windows.png) Para Windows (PowerShell)
+---
+
+### ![win](images/windows.png) Instrucciones para Windows
 
 Ejecuta una muestra de 40 solicitudes. Copia este bloque completo en PowerShell:
 
@@ -171,16 +179,7 @@ for ($i = 1; $i -le 40; $i++) {
 Write-Host "`nResultados guardados en: $outputFile"
 ```
 
-> **¿Qué hace este script?**
-> - Línea 1-2: Define el archivo de salida y lo limpia si existe
-> - Línea 4: Inicia un loop de 1 a 40
-> - Línea 5-6: Crea un archivo temporal para almacenar la respuesta
-> - Línea 8-9: Ejecuta curl y captura el código HTTP y tiempo total
-> - Línea 11-12: Lee el contenido del archivo y reemplaza saltos de línea con espacios
-> - Línea 14-15: Formatea la línea numerada y la escribe en el archivo
-> - Línea 16: Limpia el archivo temporal
-
-Ahora analiza los resultados con estos comandos:
+Analiza los resultados:
 
 ```powershell
 # Contar respuestas SUCCESS
@@ -206,10 +205,7 @@ if ($total -gt 0) {
 }
 ```
 
-> **¿Qué hace este análisis?**
-> - `Select-String`: Busca patrones en el archivo (equivalente a `grep`)
-> - `Measure-Object`: Cuenta coincidencias (equivalente a `-c` de `grep`)
-> - `[math]::Round()`: Redondea a 4 decimales (equivalente a `bc`)
+---
 
 ### Formato Esperado de `availability-baseline.txt`
 
@@ -259,7 +255,7 @@ Esta línea base es tu referencia para comparar en el laboratorio 1.2.
 
 **Síntoma:** Error de permiso, comando no encontrado o error Maven.
 
-**Solución Linux/Mac:**
+![linux](images/linux.png) **Solución Linux/Mac:**
 
 ```bash
 cd proyecto-base-unidad-01/catalog-service
@@ -267,7 +263,7 @@ chmod +x mvnw  # Asegurar que es ejecutable
 ./mvnw quarkus:dev
 ```
 
-**Solución Windows:**
+![win](images/windows.png) **Solución Windows:**
 
 ```powershell
 cd proyecto-base-unidad-01\catalog-service
@@ -280,7 +276,7 @@ cd proyecto-base-unidad-01\catalog-service
 
 **Síntoma:** Error `Address already in use: bind`.
 
-**Solución ![linux](images/linux.png) Linux/macOS:**
+![linux](images/linux.png) **Solución Linux/macOS:**
 
 ```bash
 # Identifica qué proceso usa el puerto 8080
@@ -294,7 +290,7 @@ cd proyecto-base-unidad-01/catalog-service
 ./mvnw quarkus:dev -Dquarkus.http.port=9090
 ```
 
-**Solución ![win](images/windows.png) Windows (PowerShell):**
+![win](images/windows.png) **Solución Windows (PowerShell):**
 
 ```powershell
 # Identifica qué proceso usa el puerto 8080
@@ -339,7 +335,7 @@ curl -i http://localhost:8080/v1/products
 
 **Causa común:** La simulación es probabilística; con 40 solicitudes puede no capturar suficientes fallos.
 
-**Solución ![linux](images/linux.png) Linux/macOS:** Ejecuta más solicitudes:
+![linux](images/linux.png) **Solución Linux/macOS:** Ejecuta más solicitudes:
 
 ```bash
 for i in {1..100}; do
@@ -362,7 +358,7 @@ echo "Respuestas HTTP distintas de 200: $HTTP_ERRORS"
 echo "Disponibilidad observada: $(echo "scale=4; $HTTP_200 / $TOTAL" | bc)"
 ```
 
-**Solución ![win](images/windows.png) Windows (PowerShell):** Modifica el script anterior (Paso 3) para 100 solicitudes:
+![win](images/windows.png) **Solución Windows (PowerShell):** Modifica el script anterior (Paso 3) para 100 solicitudes:
 
 ```powershell
 # Cambiar esta línea:
@@ -393,13 +389,13 @@ Write-Host "HTTP 500: $http500"
 
 **Síntoma:** Los logs se imprimen lentamente o hay mucho ruido.
 
-**Solución ![linux](images/linux.png) Linux/macOS:**
+![linux](images/linux.png) **Solución Linux/macOS:**
 
 ```bash
 ./mvnw quarkus:dev -Dquarkus.log.level=WARN
 ```
 
-**Solución ![win](images/windows.png) Windows (PowerShell):**
+![win](images/windows.png) **Solución Windows (PowerShell):**
 
 ```powershell
 .\mvnw.cmd quarkus:dev -Dquarkus.log.level=WARN
