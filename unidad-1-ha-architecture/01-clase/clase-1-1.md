@@ -1,6 +1,6 @@
 # 1.1 Fundamentos de Disponibilidad y Confiabilidad
 
-Iniciamos la Unidad 1 estableciendo los cimientos teóricos y cuantitativos para entender por qué los sistemas fallan y cómo medimos su capacidad de mantenerse a flote antes de diseñar arquitecturas distribuidas.
+Iniciamos la unidad estableciendo los cimientos teóricos y cuantitativos para entender por qué los sistemas fallan y cómo medimos su capacidad de mantenerse a flote antes de diseñar arquitecturas distribuidas.
 
 ## 1. Explicación conceptual
 
@@ -79,13 +79,9 @@ Imagina la cocina de un restaurante de alta cocina con una estrella Michelin dur
 
 ![domino](images/image-1-3.jpeg)
 
-## 3. Desglose técnico paso a paso
+## 3. Laboratorio
 
-Esta sección se realiza como laboratorio parcial sobre el starter `catalog-service`. Sigue el [Laboratorio de la clase 1.1](../02-laboratorio/laboratorio-clase-1-1.md) para ejecutar la línea base, revisar los _health checks_ y medir latencia y errores antes de añadir resiliencia.
-
-### Paso 1: Configurar la aplicación Quarkus
-
-El procedimiento completo está en el [Laboratorio de la clase 1.1](../02-laboratorio/laboratorio-clase-1-1.md). El starter debe ejecutarse y medirse antes de cualquier cambio: el resultado esperado es una línea base con respuestas `SUCCESS`, latencia simulada y algunos errores HTTP, sin `DEGRADED_CACHE`.
+Para completar esta parte, sigue el [Laboratorio de la clase 1.1](../02-laboratorio/laboratorio-clase-1-1.md). Allí encontrarás todos los pasos, código y procedimientos necesarios.
 
 ## 4. Reto de ingeniería o pregunta de reflexión
 

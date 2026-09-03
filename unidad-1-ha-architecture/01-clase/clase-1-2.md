@@ -62,11 +62,9 @@ Imagina la estructura y operación de un crucero transatlántico en alta mar:
 
 - **Fallback:** Si se interrumpe la señal del satélite para ver televisión por cable en vivo en las suites, el sistema activa automáticamente una transmisión de películas almacenadas previamente en el servidor local del barco. El usuario nota la ausencia de canales en vivo, pero sigue teniendo entretenimiento disponible.
 
-## 3. Desglose técnico paso a paso
+## 3. Laboratorio
 
-Esta sección se realiza como laboratorio parcial sobre el mismo proyecto de la clase 1.1. Sigue el [Laboratorio de la clase 1.2](../02-laboratorio/laboratorio-clase-1-2.md). Allí se implementan progresivamente `Timeout`, `Retry`, `Fallback` y `CircuitBreaker`, y se comparan los resultados con la línea base anterior.
-
-No crees otro servicio ni copies el ejemplo conceptual de pagos: el entregable de esta clase es una modificación comprobable de `catalog-service`.
+Para completar esta parte, sigue el [Laboratorio de la clase 1.2](../02-laboratorio/laboratorio-clase-1-2.md). Allí encontrarás todos los pasos, código y procedimientos necesarios.
 
 ## 4. Reto de ingeniería o pregunta de reflexión
 

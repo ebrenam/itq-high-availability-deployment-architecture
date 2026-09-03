@@ -1,25 +1,4 @@
-# Unidad 1: Arquitecturas de alta disponibilidad y escalabilidad
-
-## Estructura de la Unidad
-
-```text
-01-clase/                     # Clases teóricas
-├── clase-1-1.md              # Fundamentos de disponibilidad y confiabilidad
-├── clase-1-2.md              # Patrones de diseño para resiliencia
-└── clase-1-3.md              # Despliegue en la nube y zonas de disponibilidad
-   
-02-laboratorio/               # Laboratorio con proyecto funcional
-├── laboratorio-1.md          # Especificación del laboratorio integrador
-├── laboratorio-clase-1-1.md  # Línea base de disponibilidad
-├── laboratorio-clase-1-2.md  # Patrones de resiliencia
-├── laboratorio-clase-1-3.md  # Despliegue y autocuración
-└── proyecto-base/            # Código base (catalog-service)
-    ├── desplegar.sh
-    ├── docker-compose.yml
-    ├── validar.sh
-    ├── catalog-service/
-    └── ...
-```
+# 🚀 Unidad 1: Arquitecturas de Alta Disponibilidad y Escalabilidad
 
 ## Objetivos de aprendizaje
 
@@ -29,84 +8,80 @@
 
 - Reconocer patrones de resiliencia a nivel de infraestructura y su aplicación en entornos cloud.
 
-## Estructura del contenido
+## Estructura de la Unidad
 
-### 1.1 Fundamentos de Disponibilidad y Confiabilidad
+```text
+unidad-1-ha-architecture/
+├── glosario.md                      # Diccionario de términos
+├── README.md                        # Este archivo
+│
+├── 01-clase/                        # TEORÍA — Conceptos y principios
+│   ├── clase-1-1.md                 # Disponibilidad, confiabilidad, SLI/SLO/SLA
+│   ├── clase-1-2.md                 # Patrones: Timeout, Retry, CircuitBreaker, Fallback
+│   ├── clase-1-3.md                 # Multi-AZ, Kubernetes, autocuración
+│   └── images/                      # Diagramas conceptuales
+│
+├── 02-laboratorio/                  # PRÁCTICA — Implementación hands-on
+│   ├── laboratorio-clase-1-1.md     # Lab 1.1: Medir línea base (~70% disponibilidad)
+│   ├── laboratorio-clase-1-2.md     # Lab 1.2: Implementar patrones (~90%+ disponibilidad)
+│   ├── laboratorio-clase-1-3.md     # Lab 1.3: Desplegar en Kubernetes (~99%+ disponibilidad)
+│   │
+│   └── proyecto-base-unidad-01/     # CÓDIGO FUNCIONAL — Catalog Service
+│       ├── README.md                # Setup local y stack tecnológico
+│       ├── QUICKSTART.md            # Comandos esenciales
+│       ├── docker-compose.yml       # Docker Compose para desarrollo local
+│       ├── desplegar.sh             # Script de despliegue
+│       ├── validar.sh               # Script de validación
+│       │
+│       └── catalog-service/         # Microservicio resiliente
+│           ├── src/main/java/.../
+│           │   └── CatalogResource.java      # Editarás aquí (Labs 1.1→1.2→1.3)
+│           ├── src/main/resources/
+│           │   └── application.properties    # Config Quarkus
+│           ├── k8s/
+│           │   ├── 01-deployment.yaml        # Editarás aquí (Lab 1.3)
+│           │   └── 02-service.yaml           # Editarás aquí (Lab 1.3)
+│           ├── pom.xml                       # Dependencies (Quarkus 3.38.0)
+│           ├── Dockerfile                    # Imagen Docker multi-stage
+│           └── target/                       # Build artifacts
+```
 
-- Conceptos de disponibilidad, confiabilidad, redundancia y tolerancia a fallos.
+## Contenido de Clases
 
-- Factores que impactan la continuidad operativa en sistemas distribuidos.
+### **1.1 Fundamentos de Disponibilidad y Confiabilidad**
+- Conceptos: Disponibilidad vs. Confiabilidad
+- Métricas: SLI, SLO, SLA, MTTR, MTTF, MTBF
+- Puntos únicos de fallo (SPOF)
+- Error budgets
+- **Laboratorio:** Medir baseline sin patrones
 
-- Relación entre arquitectura, riesgo operativo y niveles de servicio.
+### **1.2 Patrones de Diseño para Resiliencia**
+- Timeout: Cancela operaciones lentas
+- Retry: Reintenta automáticamente
+- Circuit Breaker: Protege contra cascadas
+- Fallback: Degradación elegante
+- Bulkhead: Aislamiento de recursos
+- **Laboratorio:** Implementar 4 patrones en código
 
-### 1.2 Patrones de Diseño para la Resiliencia y la Distribución
+### **1.3 Despliegue en Nube Multi-AZ**
+- Regiones y Zonas de Disponibilidad
+- Single-AZ vs. Multi-AZ
+- Kubernetes y orquestación automática
+- Health checks (startup, liveness, readiness)
+- Topology spread constraints
+- Autocuración (_self-healing_)
+- **Laboratorio:** Desplegar en Kubernetes con 3 réplicas
 
-- Replicación, balanceo de carga y desacoplamiento de componentes.
+---
 
-- Estrategias para reducir puntos únicos de falla.
+## Relación con Próximas Unidades
 
-- Principios de distribución para soportar crecimiento y recuperación ante incidentes.
-
-### 1.3 Despliegue en la Nube y Zonas de Disponibilidad
-
-- Fundamentos de despliegue distribuido en infraestructura cloud.
-
-- Uso de regiones y zonas de disponibilidad para mejorar resiliencia.
-
-- Consideraciones de diseño para alta disponibilidad en proveedores como AWS, GCP y Azure.
-
-## Competencias
-
-**Específica(s):**
-
-- Identificar factores que afectan disponibilidad.
-
-- Diseñar sistemas replicados, balanceados y distribuidos.
-
-- Conocer patrones de resiliencia a nivel infraestructura.
-
-**Competencias genéricas:**
-
-- Planea y administra el tiempo.
-
-- Formula las especificaciones de un proyecto, considerando restricciones tanto técnicas como económicas y sociales.
-
-- Capacidad de organización.
-
-- Compara diferentes alternativas de solución.
-
-- Selecciona la solución más adecuada, satisfaciendo los requerimientos.
-
-- Capacidad crítica y autocrítica.
-
-- Trabajo en equipo.
-
-- Habilidades interpersonales.
-
-- Capacidad de generar nuevas ideas (creatividad).
-
-- Habilidades de investigación.
-
-- Capacidad de aprender.
-
-## Actividades de aprendizaje
-
-- Elaboración de mapa mental de patrones de alta disponibilidad.
-
-- Análisis de arquitectura real (AWS, GCP, Azure).
-
-- Simulación de fallos y propuesta de mitigación.
-
-## Punto de partida recomendado
-
-La unidad debe iniciar con `u1-starter` como nombre conceptual del estado inicial del proyecto: una base mínima funcional de la plataforma e-commerce con el esqueleto del sistema y un primer servicio operativo (`catalog-service`). En el repositorio, esa base se materializa en [02-laboratorio/proyecto-base](02-laboratorio/proyecto-base), que es el directorio real del starter. Ver también [02-laboratorio/laboratorio-1.md](02-laboratorio/laboratorio-1.md). El resultado final de esta unidad se convierte en el starter de la Unidad 2.
-
-**Flujo pedagógico:**
-1. **Semanas 1-2:** Clases teóricas (1.1, 1.2, 1.3) establecen conceptos
-2. **Después de la clase 1.1:** [Laboratorio parcial 1.1](02-laboratorio/laboratorio-clase-1-1.md) establece la línea base
-3. **Después de la clase 1.2:** [Laboratorio parcial 1.2](02-laboratorio/laboratorio-clase-1-2.md) agrega resiliencia
-4. **Después de la clase 1.3:** [Laboratorio parcial 1.3](02-laboratorio/laboratorio-clase-1-3.md) agrega despliegue y autocuración
-5. **Cierre:** [Laboratorio integrador](02-laboratorio/laboratorio-1.md) reúne las evidencias
+| Unidad Anterior | Esta Unidad | Unidad Siguiente |
+|-----------------|-------------|-----------------|
+| — | **Unidad 1: HA-Architecture** | Unidad 2: Kubernetes |
+| | Construyes una app resiliente con patrones de software | Orquestas a escala: DaemonSets, StatefulSets, Operators |
+| | Despliegas en Kubernetes local | Despliegas en clusters multi-nodo, prod-ready |
+| | Validas autocuración básica | Validas rolling updates, blue-green deployments |
 
 ## Bibliografía
 
