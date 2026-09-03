@@ -27,13 +27,8 @@ unidad-1-ha-architecture/
 │   ├── laboratorio-clase-1-3.md     # Lab 1.3: Desplegar en Kubernetes (~99%+ disponibilidad)
 │   │
 │   └── proyecto-base-unidad-01/     # CÓDIGO FUNCIONAL — Catalog Service
-│       ├── README.md                # Setup local y stack tecnológico
-│       ├── QUICKSTART.md            # Comandos esenciales
-│       ├── docker-compose.yml       # Docker Compose para desarrollo local
-│       ├── desplegar.sh             # Script de despliegue
-│       ├── validar.sh               # Script de validación
-│       │
 │       └── catalog-service/         # Microservicio resiliente
+│           ├── README.md            # Setup rápido + referencias a laboratorios
 │           ├── src/main/java/.../
 │           │   └── CatalogResource.java      # Editarás aquí (Labs 1.1→1.2→1.3)
 │           ├── src/main/resources/

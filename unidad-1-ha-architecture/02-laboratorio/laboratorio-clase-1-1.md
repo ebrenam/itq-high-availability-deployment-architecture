@@ -12,13 +12,27 @@ Durante el último evento de ventas masivas, el servicio de catálogo colapsó p
 
 ## Prerequisitos y stack tecnológico
 
-Antes de iniciar, debes contar con las siguientes herramientas instaladas y funcionales en tu entorno de desarrollo Linux/macOS:
+Antes de iniciar, debes contar con las siguientes herramientas instaladas y funcionales en tu entorno de desarrollo:
+
+### Requisitos comunes (Linux, macOS y Windows)
 
 - **Java OpenJDK 25** y **Apache Maven 3.8+**.
 - **Docker Engine** (v24.0+) o **Podman**.
 - **Minikube** (v1.30+) o **Kind** (Kubernetes v1.28+) — opcional para este laboratorio, obligatorio para 1.3.
 - **kubectl** configurado e interconectado con tu clúster local — opcional para este laboratorio, obligatorio para 1.3.
 - **curl** o **Apache Bench (`ab`)** para generación de tráfico de prueba.
+
+### Requisitos específicos por SO
+
+**Linux/macOS:**
+- Terminal bash nativa
+- Herramientas Unix: `grep`, `mktemp`, `wc`, `bc`
+
+**Windows:**
+- **PowerShell 5.0+** (recomendado) o **PowerShell Core** (pwsh)
+  - Verifica tu versión: `$PSVersionTable.PSVersion`
+  - Si tienes PowerShell < 5.0, actualiza desde [aquí](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows)
+- **curl** (incluido en Windows 10.1903+; si no lo tienes, usa el `curl.exe` del subsistema WSL o instala desde [curl.se](https://curl.se/download.html))
 
 ## Objetivo
 
@@ -29,6 +43,8 @@ Ejecutar el `catalog-service` inicial y medir su comportamiento antes de añadir
 Trabaja desde `02-laboratorio/proyecto-base-unidad-01/catalog-service`. Este proyecto base ya expone `/v1/products`, simula latencia alta y fallas de conexión, y contiene el health check base. Todavía no incluye `Timeout`, `Retry`, `Fallback` ni `CircuitBreaker`.
 
 ## Paso 1: Ejecutar la aplicación
+
+### 🐧 🍎 Para Linux/macOS
 
 En la Terminal 1:
 
@@ -44,6 +60,31 @@ En la Terminal 2, confirma que el endpoint responde:
 ```bash
 curl -i http://localhost:8080/v1/products
 ```
+
+### 🪟 Para Windows
+
+En la Terminal 1 (PowerShell o CMD):
+
+```powershell
+cd unidad-1-ha-architecture\02-laboratorio\proyecto-base-unidad-01\catalog-service
+.\mvnw.cmd quarkus:dev
+```
+
+> **Nota:** En PowerShell, si ves error de permisos de ejecución, ejecuta primero:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
+
+En la Terminal 2 (PowerShell):
+
+```powershell
+curl -i http://localhost:8080/v1/products
+```
+
+> Si `curl` no está disponible, usa:
+> ```powershell
+> Invoke-WebRequest -Uri http://localhost:8080/v1/products -Headers @{"User-Agent"="PowerShell"}
+> ```
 
 > **⚠️ Nota Importante:** Este endpoint puede responder de dos formas:
 > - **HTTP 200 + JSON `SUCCESS`:** La solicitud fue exitosa (50% de probabilidad)
@@ -63,6 +104,8 @@ curl -i http://localhost:8080/live
 Registra si cada endpoint responde `UP` o `DOWN`. En esta etapa, `/ready` simula una disponibilidad del 95%.
 
 ## Paso 3: Medir la línea base
+
+### 🐧 🍎 Para Linux/macOS
 
 Ejecuta una muestra de 40 solicitudes:
 
@@ -90,6 +133,81 @@ echo "Respuestas HTTP 200: $HTTP_200"
 echo "Respuestas HTTP distintas de 200: $HTTP_ERRORS"
 echo "Disponibilidad observada: $(echo "scale=4; $HTTP_200 / $TOTAL" | bc)"
 ```
+
+### 🪟 Para Windows (PowerShell)
+
+Ejecuta una muestra de 40 solicitudes. Copia este bloque completo en PowerShell:
+
+```powershell
+# Crear archivo de salida
+$outputFile = "availability-baseline.txt"
+if (Test-Path $outputFile) { Remove-Item $outputFile }
+
+# Loop de 40 solicitudes
+for ($i = 1; $i -le 40; $i++) {
+    # Crear archivo temporal para guardar la respuesta
+    $tempFile = [System.IO.Path]::GetTempFileName()
+    
+    try {
+        # Ejecutar curl y capturar metadata (código HTTP y tiempo)
+        $output = curl -sS -o $tempFile -w "%{http_code} %{time_total}" http://localhost:8080/v1/products 2>$null
+        
+        # Leer el cuerpo de la respuesta
+        $body = Get-Content -Raw -Path $tempFile 2>$null | ForEach-Object { $_ -replace "`r?`n", ' ' }
+        
+        # Formatear y escribir línea
+        $line = "{0:D2} {1} {2}" -f $i, $output, $body
+        Add-Content -Path $outputFile -Value $line
+        
+        Write-Host $line
+    }
+    finally {
+        Remove-Item -Force $tempFile -ErrorAction SilentlyContinue
+    }
+}
+
+Write-Host "`nResultados guardados en: $outputFile"
+```
+
+> **¿Qué hace este script?**
+> - Línea 1-2: Define el archivo de salida y lo limpia si existe
+> - Línea 4: Inicia un loop de 1 a 40
+> - Línea 5-6: Crea un archivo temporal para almacenar la respuesta
+> - Línea 8-9: Ejecuta curl y captura el código HTTP y tiempo total
+> - Línea 11-12: Lee el contenido del archivo y reemplaza saltos de línea con espacios
+> - Línea 14-15: Formatea la línea numerada y la escribe en el archivo
+> - Línea 16: Limpia el archivo temporal
+
+Ahora analiza los resultados con estos comandos:
+
+```powershell
+# Contar respuestas SUCCESS
+$success = @(Select-String -Path availability-baseline.txt -Pattern '"status":"SUCCESS"' | Measure-Object).Count
+Write-Host "Respuestas SUCCESS: $success"
+
+# Contar respuestas HTTP 200
+$http200 = @(Select-String -Path availability-baseline.txt -Pattern '^\d+ 200 ' | Measure-Object).Count
+Write-Host "Respuestas HTTP 200: $http200"
+
+# Contar errores (líneas que NO tienen 200)
+$httpErrors = @(Select-String -Path availability-baseline.txt -Pattern '^\d+ (?!200 )' | Measure-Object).Count
+Write-Host "Respuestas HTTP distintas de 200: $httpErrors"
+
+# Contar total de líneas
+$total = @(Get-Content availability-baseline.txt | Measure-Object -Line).Lines
+Write-Host "Solicitudes totales: $total"
+
+# Calcular disponibilidad
+if ($total -gt 0) {
+    $availability = [math]::Round($http200 / $total, 4)
+    Write-Host "Disponibilidad observada: $availability"
+}
+```
+
+> **¿Qué hace este análisis?**
+> - `Select-String`: Busca patrones en el archivo (equivalente a `grep`)
+> - `Measure-Object`: Cuenta coincidencias (equivalente a `-c` de `grep`)
+> - `[math]::Round()`: Redondea a 4 decimales (equivalente a `bc`)
 
 ### Formato Esperado de `availability-baseline.txt`
 
@@ -160,20 +278,35 @@ cd proyecto-base-unidad-01\catalog-service
 
 **Síntoma:** Error `Address already in use: bind`.
 
-**Solución:**
+**Solución 🐧 🍎 Linux/macOS:**
 
 ```bash
 # Identifica qué proceso usa el puerto 8080
-lsof -i :8080  # Linux/Mac
-netstat -ano | findstr :8080  # Windows
+lsof -i :8080
 
-# Matar el proceso o usar otro puerto
-# Matar proceso (Linux/Mac)
+# Matar el proceso
 kill -9 <PID>
 
 # O cambiar puerto en Terminal 1
 cd proyecto-base-unidad-01/catalog-service
 ./mvnw quarkus:dev -Dquarkus.http.port=9090
+```
+
+**Solución 🪟 Windows (PowerShell):**
+
+```powershell
+# Identifica qué proceso usa el puerto 8080
+netstat -ano | findstr :8080
+
+# Matar el proceso (reemplaza PID con el número encontrado)
+taskkill /PID <PID> /F
+
+# O cambiar puerto en Terminal 1
+cd proyecto-base-unidad-01\catalog-service
+.\mvnw.cmd quarkus:dev -Dquarkus.http.port=9090
+
+# Si cambias el puerto, actualiza las URLs de curl:
+curl -i http://localhost:9090/v1/products
 ```
 
 ---
@@ -204,7 +337,7 @@ curl -i http://localhost:8080/v1/products
 
 **Causa común:** La simulación es probabilística; con 40 solicitudes puede no capturar suficientes fallos.
 
-**Solución:** Ejecuta más solicitudes:
+**Solución 🐧 🍎 Linux/macOS:** Ejecuta más solicitudes:
 
 ```bash
 for i in {1..100}; do
@@ -214,8 +347,6 @@ for i in {1..100}; do
     printf '%03d %s %s\n' "$i" "$metadata" "$body"
     rm -f "$response_file"
 done | tee availability-baseline-100.txt
-
----
 
 SUCCESS=$(grep -c '"status":"SUCCESS"' availability-baseline-100.txt || true)
 HTTP_200=$(grep -cE '^[0-9]+ 200 ' availability-baseline-100.txt || true)
@@ -229,11 +360,29 @@ echo "Respuestas HTTP distintas de 200: $HTTP_ERRORS"
 echo "Disponibilidad observada: $(echo "scale=4; $HTTP_200 / $TOTAL" | bc)"
 ```
 
-Analiza estadísticas en la muestra más grande:
+**Solución 🪟 Windows (PowerShell):** Modifica el script anterior (Paso 3) para 100 solicitudes:
 
-```bash
-grep -c "200" availability-baseline-100.txt
-grep -c "500" availability-baseline-100.txt
+```powershell
+# Cambiar esta línea:
+for ($i = 1; $i -le 40; $i++) {
+
+# A esta:
+for ($i = 1; $i -le 100; $i++) {
+
+# Y al final, guarda con un nuevo nombre:
+$outputFile = "availability-baseline-100.txt"
+```
+
+Luego analiza con:
+
+```powershell
+$total = @(Get-Content availability-baseline-100.txt | Measure-Object -Line).Lines
+$http200 = @(Select-String -Path availability-baseline-100.txt -Pattern '^\d+ 200 ' | Measure-Object).Count
+$http500 = @(Select-String -Path availability-baseline-100.txt -Pattern '^\d+ 500 ' | Measure-Object).Count
+
+Write-Host "Total: $total"
+Write-Host "HTTP 200: $http200"
+Write-Host "HTTP 500: $http500"
 ```
 
 ---
@@ -242,10 +391,16 @@ grep -c "500" availability-baseline-100.txt
 
 **Síntoma:** Los logs se imprimen lentamente o hay mucho ruido.
 
-**Solución:** Reduce el nivel de logging:
+**Solución 🐧 🍎 Linux/macOS:**
 
 ```bash
 ./mvnw quarkus:dev -Dquarkus.log.level=WARN
+```
+
+**Solución 🪟 Windows (PowerShell):**
+
+```powershell
+.\mvnw.cmd quarkus:dev -Dquarkus.log.level=WARN
 ```
 
 Esto muestra solo WARNING y ERROR, ocultando DEBUG e INFO.
