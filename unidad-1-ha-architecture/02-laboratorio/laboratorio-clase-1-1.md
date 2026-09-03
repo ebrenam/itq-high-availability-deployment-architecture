@@ -24,11 +24,13 @@ Antes de iniciar, debes contar con las siguientes herramientas instaladas y func
 
 ### Requisitos específicos por SO
 
-**Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
+
 - Terminal bash nativa
 - Herramientas Unix: `grep`, `mktemp`, `wc`, `bc`
 
-**Windows:**
+![win](images/windows.png) **Windows:**
+
 - **PowerShell 5.0+** (recomendado) o **PowerShell Core** (pwsh)
   - Verifica tu versión: `$PSVersionTable.PSVersion`
   - Si tienes PowerShell < 5.0, actualiza desde [aquí](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows)
@@ -44,7 +46,7 @@ Trabaja desde `02-laboratorio/proyecto-base-unidad-01/catalog-service`. Este pro
 
 ## Paso 1: Ejecutar la aplicación
 
-### 🐧 🍎 Para Linux/macOS
+### ![linux](images/linux.png) Para Linux/macOS
 
 En la Terminal 1:
 
@@ -61,7 +63,7 @@ En la Terminal 2, confirma que el endpoint responde:
 curl -i http://localhost:8080/v1/products
 ```
 
-### 🪟 Para Windows
+### ![win](images/windows.png) Para Windows
 
 En la Terminal 1 (PowerShell o CMD):
 
@@ -105,7 +107,7 @@ Registra si cada endpoint responde `UP` o `DOWN`. En esta etapa, `/ready` simula
 
 ## Paso 3: Medir la línea base
 
-### 🐧 🍎 Para Linux/macOS
+### ![linux](images/linux.png) Para Linux/macOS
 
 Ejecuta una muestra de 40 solicitudes:
 
@@ -134,7 +136,7 @@ echo "Respuestas HTTP distintas de 200: $HTTP_ERRORS"
 echo "Disponibilidad observada: $(echo "scale=4; $HTTP_200 / $TOTAL" | bc)"
 ```
 
-### 🪟 Para Windows (PowerShell)
+### ![win](images/windows.png) Para Windows (PowerShell)
 
 Ejecuta una muestra de 40 solicitudes. Copia este bloque completo en PowerShell:
 
@@ -278,7 +280,7 @@ cd proyecto-base-unidad-01\catalog-service
 
 **Síntoma:** Error `Address already in use: bind`.
 
-**Solución 🐧 🍎 Linux/macOS:**
+**Solución ![linux](images/linux.png) Linux/macOS:**
 
 ```bash
 # Identifica qué proceso usa el puerto 8080
@@ -292,7 +294,7 @@ cd proyecto-base-unidad-01/catalog-service
 ./mvnw quarkus:dev -Dquarkus.http.port=9090
 ```
 
-**Solución 🪟 Windows (PowerShell):**
+**Solución ![win](images/windows.png) Windows (PowerShell):**
 
 ```powershell
 # Identifica qué proceso usa el puerto 8080
@@ -337,7 +339,7 @@ curl -i http://localhost:8080/v1/products
 
 **Causa común:** La simulación es probabilística; con 40 solicitudes puede no capturar suficientes fallos.
 
-**Solución 🐧 🍎 Linux/macOS:** Ejecuta más solicitudes:
+**Solución ![linux](images/linux.png) Linux/macOS:** Ejecuta más solicitudes:
 
 ```bash
 for i in {1..100}; do
@@ -360,7 +362,7 @@ echo "Respuestas HTTP distintas de 200: $HTTP_ERRORS"
 echo "Disponibilidad observada: $(echo "scale=4; $HTTP_200 / $TOTAL" | bc)"
 ```
 
-**Solución 🪟 Windows (PowerShell):** Modifica el script anterior (Paso 3) para 100 solicitudes:
+**Solución ![win](images/windows.png) Windows (PowerShell):** Modifica el script anterior (Paso 3) para 100 solicitudes:
 
 ```powershell
 # Cambiar esta línea:
@@ -391,13 +393,13 @@ Write-Host "HTTP 500: $http500"
 
 **Síntoma:** Los logs se imprimen lentamente o hay mucho ruido.
 
-**Solución 🐧 🍎 Linux/macOS:**
+**Solución ![linux](images/linux.png) Linux/macOS:**
 
 ```bash
 ./mvnw quarkus:dev -Dquarkus.log.level=WARN
 ```
 
-**Solución 🪟 Windows (PowerShell):**
+**Solución ![win](images/windows.png) Windows (PowerShell):**
 
 ```powershell
 .\mvnw.cmd quarkus:dev -Dquarkus.log.level=WARN
