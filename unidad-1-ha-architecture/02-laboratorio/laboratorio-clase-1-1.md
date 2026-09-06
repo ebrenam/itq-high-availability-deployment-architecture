@@ -85,10 +85,10 @@ En la Terminal 2 (PowerShell):
 curl -i http://localhost:8080/v1/products
 ```
 
-> Si `curl` no está disponible, usa:
-> ```powershell
-> Invoke-WebRequest -Uri http://localhost:8080/v1/products -Headers @{"User-Agent"="PowerShell"}
-> ```
+> **Nota:** PowerShell en Windows 10.1903+ incluye `curl` como alias de `Invoke-WebRequest`.
+> - Si quieres usar `curl.exe` directamente (versión nativa), asegúrate de que esté en `PATH`
+> - Si `curl` no funciona, puedes remover el alias: `Remove-Item alias:curl`
+> - Alternativa: Usa `Invoke-WebRequest -Uri http://localhost:8080/v1/products -Headers @{"User-Agent"="PowerShell"}`
 
 ---
 
@@ -146,29 +146,26 @@ echo "Disponibilidad observada: $(echo "scale=4; $HTTP_200 / $TOTAL" | bc)"
 
 ### ![win](images/windows.png) Instrucciones para Windows
 
-Ejecuta una muestra de 40 solicitudes. Copia este bloque completo en PowerShell:
+Crea el archivo `test-availability.ps1` con el código adaptado a PowerShell:
 
 ```powershell
-# Crear archivo de salida
+# 1. Definir y limpiar archivo de salida
 $outputFile = "availability-baseline.txt"
 if (Test-Path $outputFile) { Remove-Item $outputFile }
 
-# Loop de 40 solicitudes
+Write-Host "Ejecutando 40 solicitudes..." -ForegroundColor Cyan
+
+# 2. Loop de 40 solicitudes
 for ($i = 1; $i -le 40; $i++) {
-    # Crear archivo temporal para guardar la respuesta
     $tempFile = [System.IO.Path]::GetTempFileName()
-    
     try {
-        # Ejecutar curl y capturar metadata (código HTTP y tiempo)
-        $output = curl -sS -o $tempFile -w "%{http_code} %{time_total}" http://localhost:8080/v1/products 2>$null
+        # Importante: usar curl.exe explícitamente en Windows
+        $output = curl.exe -sS -o $tempFile -w "%{http_code} %{time_total}" http://localhost:8080/v1/products 2>$null
         
-        # Leer el cuerpo de la respuesta
         $body = Get-Content -Raw -Path $tempFile 2>$null | ForEach-Object { $_ -replace "`r?`n", ' ' }
         
-        # Formatear y escribir línea
         $line = "{0:D2} {1} {2}" -f $i, $output, $body
         Add-Content -Path $outputFile -Value $line
-        
         Write-Host $line
     }
     finally {
@@ -176,38 +173,37 @@ for ($i = 1; $i -le 40; $i++) {
     }
 }
 
-Write-Host "`nResultados guardados en: $outputFile"
-```
+Write-Host "`nResultados guardados en: $outputFile`n" -ForegroundColor Green
 
-Analiza los resultados:
+# 3. Procesar métricas utilizando objetos de PowerShell en lugar de Regex frágiles
+$lines = Get-Content $outputFile
 
-```powershell
-# Contar respuestas SUCCESS
-$success = @(Select-String -Path availability-baseline.txt -Pattern '"status":"SUCCESS"' | Measure-Object).Count
+$total = $lines.Count
+$success = ($lines | Where-Object { $_ -like '*"status":"SUCCESS"*' }).Count
+$http200 = ($lines | Where-Object { $_ -match '^\d+\s+200\s+' }).Count
+$httpErrors = $total - $http200
+
+# 4. Mostrar Resultados
 Write-Host "Respuestas SUCCESS: $success"
-
-# Contar respuestas HTTP 200
-$http200 = @(Select-String -Path availability-baseline.txt -Pattern '^\d+ 200 ' | Measure-Object).Count
 Write-Host "Respuestas HTTP 200: $http200"
-
-# Contar errores (líneas que NO tienen 200)
-$httpErrors = @(Select-String -Path availability-baseline.txt -Pattern '^\d+ (?!200 )' | Measure-Object).Count
 Write-Host "Respuestas HTTP distintas de 200: $httpErrors"
-
-# Contar total de líneas
-$total = @(Get-Content availability-baseline.txt | Measure-Object -Line).Lines
 Write-Host "Solicitudes totales: $total"
 
-# Calcular disponibilidad
 if ($total -gt 0) {
     $availability = [math]::Round($http200 / $total, 4)
-    Write-Host "Disponibilidad observada: $availability"
+    Write-Host "Disponibilidad observada: $availability" -ForegroundColor Yellow
 }
+```
+
+Luego ejecuta en PowerShell:
+
+```powershell
+.\test-availability.ps1
 ```
 
 ---
 
-### Formato Esperado de `availability-baseline.txt`
+### Formato esperado de `availability-baseline.txt`
 
 Una vez ejecutado el comando de medición, tu archivo debe verse aproximadamente así (los valores numéricos pueden variar por la naturaleza aleatoria de la simulación):
 
@@ -294,7 +290,7 @@ cd proyecto-base-unidad-01/catalog-service
 
 ```powershell
 # Identifica qué proceso usa el puerto 8080
-netstat -ano | findstr :8080
+netstat -noa | findstr :8080
 
 # Matar el proceso (reemplaza PID con el número encontrado)
 taskkill /PID <PID> /F
@@ -367,7 +363,7 @@ for ($i = 1; $i -le 40; $i++) {
 # A esta:
 for ($i = 1; $i -le 100; $i++) {
 
-# Y al final, guarda con un nuevo nombre:
+# Y guarda con un nuevo nombre:
 $outputFile = "availability-baseline-100.txt"
 ```
 
