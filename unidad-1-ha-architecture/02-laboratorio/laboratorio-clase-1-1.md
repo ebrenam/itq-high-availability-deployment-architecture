@@ -46,6 +46,12 @@ Trabaja desde `02-laboratorio/proyecto-base-unidad-01/catalog-service`. Este pro
 
 ## Paso 1: Ejecutar la aplicación
 
+> **⚠️ Nota Importante:** El endpoint expuesto puede responder de tres formas:
+> - **HTTP 200 + JSON `SUCCESS`:** La solicitud fue exitosa (50% de probabilidad)
+> - **HTTP 500 + RuntimeException:** Simulación de falla de BD (30% de probabilidad)
+> - **Latencia alta (3000ms):** Simulación de congestión de BD (20% de probabilidad)
+
+
 ### ![linux](images/linux.png) Instrucciones para Linux/macOS
 
 En la Terminal 1:
@@ -94,10 +100,7 @@ curl -i http://localhost:8080/v1/products
 
 ### Consideraciones
 
-> **⚠️ Nota Importante:** Este endpoint puede responder de dos formas:
-> - **HTTP 200 + JSON `SUCCESS`:** La solicitud fue exitosa (50% de probabilidad)
-> - **HTTP 500 + RuntimeException:** Simulación de falla de BD (30% de probabilidad)
-> - **Latencia alta (1200ms):** Simulación de congestión de BD (20% de probabilidad)
+> **📊 Nota pedagógica:** La latencia de 3 segundos es deliberadamente alta para que sea **muy obvia** cuando la veas en la salida. En el Paso 3, busca valores de `time_total` cercanos a `3.0` segundos. En el laboratorio 1.2, verás cómo el `@Timeout(800)` reduce eso a ~0.8 segundos, eliminando esos bloqueos largos.
 >
 **Es completamente normal** ver errores en algunas solicitudes. El servicio está simulando intencionalmente estos fallos para que midas su disponibilidad real sin patrones de resiliencia. En el **Paso 3**, ejecutarás 40 solicitudes consecutivas para captar esta distribución estadística completa.
 
@@ -115,31 +118,57 @@ Registra si cada endpoint responde `UP` o `DOWN`. En esta etapa, `/ready` simula
 
 ### ![linux](images/linux.png) Instrucciones para Linux/macOS
 
-Ejecuta una muestra de 40 solicitudes:
+Crea el archivo `test-availability.sh` con el siguiente contenido:
 
 ```bash
-for i in {1..40}; do
+#!/bin/bash
+
+# Script reutilizable para medir disponibilidad
+# Genera 40 solicitudes, analiza y guarda resultados en availability-baseline.txt
+
+OUTPUT_FILE="availability-baseline.txt"
+ENDPOINT_URL="http://localhost:8080/v1/products"
+NUM_REQUESTS=40
+
+# 1. Limpiar archivo de salida
+> "$OUTPUT_FILE"
+
+echo "Ejecutando $NUM_REQUESTS solicitudes a $ENDPOINT_URL..."
+
+# 2. Loop de solicitudes
+for i in $(seq 1 "$NUM_REQUESTS"); do
     response_file=$(mktemp)
-    metadata=$(curl -sS -o "$response_file" -w "%{http_code} %{time_total}" http://localhost:8080/v1/products)
+    metadata=$(curl -sS -o "$response_file" -w "%{http_code} %{time_total}" "$ENDPOINT_URL")
     body=$(cat "$response_file" | tr '\n' ' ')
-    printf '%02d %s %s\n' "$i" "$metadata" "$body"
+    printf '%02d %s %s\n' "$i" "$metadata" "$body" | tee -a "$OUTPUT_FILE"
     rm -f "$response_file"
-done | tee availability-baseline.txt
+done
+
+echo ""
+echo "Resultados guardados en: $OUTPUT_FILE"
+echo ""
+
+# 3. Procesar métricas
+SUCCESS=$(grep -c '"status":"SUCCESS"' "$OUTPUT_FILE" || true)
+HTTP_200=$(grep -cE '^[0-9]+ 200 ' "$OUTPUT_FILE" || true)
+HTTP_ERRORS=$(grep -cEv '^[0-9]+ 200 ' "$OUTPUT_FILE" || true)
+TOTAL=$(wc -l < "$OUTPUT_FILE" | tr -d ' ')
+
+if [[ $TOTAL -gt 0 ]]; then
+    AVAILABILITY=$(echo "scale=4; $HTTP_200 / $TOTAL" | bc)
+    echo "Respuestas SUCCESS: $SUCCESS"
+    echo "Respuestas HTTP 200: $HTTP_200"
+    echo "Respuestas HTTP distintas de 200: $HTTP_ERRORS"
+    echo "Solicitudes totales: $TOTAL"
+    echo "Disponibilidad observada: $AVAILABILITY"
+fi
 ```
 
-Analiza los resultados:
+Luego hazlo ejecutable y ejecuta:
 
 ```bash
-SUCCESS=$(grep -c '"status":"SUCCESS"' availability-baseline.txt || true)
-HTTP_200=$(grep -cE '^[0-9]+ 200 ' availability-baseline.txt || true)
-HTTP_ERRORS=$(grep -cEv '^[0-9]+ 200 ' availability-baseline.txt || true)
-TOTAL=$(wc -l < availability-baseline.txt | tr -d ' ')
-
-echo "Solicitudes totales: $TOTAL"
-echo "Respuestas SUCCESS: $SUCCESS"
-echo "Respuestas HTTP 200: $HTTP_200"
-echo "Respuestas HTTP distintas de 200: $HTTP_ERRORS"
-echo "Disponibilidad observada: $(echo "scale=4; $HTTP_200 / $TOTAL" | bc)"
+chmod +x test-availability.sh
+./test-availability.sh
 ```
 
 ---
@@ -234,13 +263,13 @@ Disponibilidad observada: 0.65-0.75 (aprox.)
 
 - **Aproximadamente 65-70% de disponibilidad observada** (varía con cada ejecución debido a la naturaleza probabilística)
 - **Aproximadamente 30-35% de errores HTTP 500** (varía con cada ejecución)
-- Algunos tiempos de respuesta altos (cerca de 1.2 segundos) debido a la simulación de latencia
+- **Algunos tiempos de respuesta muy altos (cerca de 3 segundos)** debido a la simulación de latencia — observa estos valores en la columna `time_total` del archivo resultante.
 - **NO hay `DEGRADED_CACHE`:** Porque `proyecto-base-unidad-01` aún no tiene patrones de resiliencia
 
-Esta línea base es tu referencia para comparar en el laboratorio 1.2.
+Esta línea base es tu referencia para comparar en el laboratorio 1.2. **Fija tu atención en los valores `time_total` cercanos a 3.0 segundos.**
 
 - Respuestas `SUCCESS` con HTTP `200`.
-- Algunas respuestas lentas por la simulación de 1200 ms.
+- Algunas respuestas lentas por la simulación de 3000 ms (3 segundos) — esta latencia desaparecerá en 1.2 gracias a `@Timeout(800)`.
 - Algunas respuestas HTTP `500` por la falla simulada de base de datos.
 - No debe aparecer `DEGRADED_CACHE`, porque `proyecto-base-unidad-01` todavía no tiene `Fallback`.
 - Los logs de la Terminal 1 deben explicar la causa de las respuestas lentas o fallidas.

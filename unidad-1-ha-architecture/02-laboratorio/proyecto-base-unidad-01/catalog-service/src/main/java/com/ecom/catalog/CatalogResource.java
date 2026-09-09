@@ -24,7 +24,7 @@ public class CatalogResource {
      * Endpoint principal que retorna el catálogo de productos.
      * 
      * Simulación de escenarios:
-     * - 20% de probabilidad de latencia alta (>1200ms)
+     * - 20% de probabilidad de latencia alta (>3000ms)
      * - 30% de probabilidad de falla de conexión a base de datos
      * - 50% de probabilidad de respuesta exitosa normal
      * 
@@ -40,7 +40,7 @@ public class CatalogResource {
         // Simular latencia degradada en la base de datos (20% de probabilidad)
         if (chance < 2) {
             LOG.warning("Simulando latencia alta en consulta de catálogo...");
-            Thread.sleep(1200);
+            Thread.sleep(3000);
         }
 
         // Simular falla de conexión a la base de datos (30% de probabilidad)
