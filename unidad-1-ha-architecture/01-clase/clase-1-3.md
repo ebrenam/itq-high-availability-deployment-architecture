@@ -2,11 +2,11 @@
 
 En la sesión anterior analizamos cómo implementar patrones de resiliencia como _circuit breaker_ y _bulkhead_ a nivel de aplicación, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar la infraestructura _multi-AZ_ y arquitecturas tolerantes a fallos en la nube.
 
-### 1. Explicación conceptual
+## 1. Explicación conceptual
 
 Aunque escribamos el código más resiliente del mundo con _circuit breakers_ y reintentos, si el centro de datos físico donde corre nuestro código sufre un corte de energía, una inundación o la fibra óptica principal se rompe, la aplicación caerá por completo. Por eso, en el entorno _cloud-native_, la alta disponibilidad a nivel de software debe complementarse obligatoriamente con la **alta disponibilidad a nivel de infraestructura y red**.
 
-#### Regiones y zonas de disponibilidad (_Availability Zones_ - AZs)
+### Regiones y zonas de disponibilidad (_Availability Zones_ - AZs)
 
 Los proveedores de nube pública estructuran su infraestructura global en tres niveles jerárquicos:
 
@@ -16,11 +16,11 @@ Los proveedores de nube pública estructuran su infraestructura global en tres n
 
 - **Ubicaciones de borde (_Edge Locations_ / Point of Presence - PoP):** Puntos de presencia distribuidos globalmente para redes de entrega de contenido (_CDN_) y _caching_ de baja latencia cerca del usuario final.
 
-#### Jerarquía: Región → AZs → Data Centers
+### Jerarquía: Región → AZs → Data Centers
 
 ![region](images/image-3-1.jpeg)
 
-#### Estrategias de despliegue: Multi-AZ vs. Multi-Región
+### Estrategias de despliegue: Multi-AZ vs. Multi-Región
 
 1. **Despliegue single-AZ:** Todas las instancias del microservicio y la base de datos corren en una sola AZ. Es económico y simple, pero presenta un riesgo altísimo: si esa AZ falla, el sistema colapsa (crea un _Single Point of Failure_).
 
@@ -28,11 +28,11 @@ Los proveedores de nube pública estructuran su infraestructura global en tres n
 
 3. **Despliegue multi-región:** La arquitectura se replica en dos o más regiones geográficas distantes. Ofrece tolerancia a desastres a nivel continental (_Disaster Recovery_ - DR), pero introduce complejidad técnica en la replicación de bases de datos debido a la latencia de red entre regiones y los costos de transferencia de datos (_data egress_).
 
-#### Single-AZ vs. Multi-AZ Comparación Visual
+### Single-AZ vs. Multi-AZ Comparación Visual
 
 ![single-multi](images/image-3-2.jpeg)
 
-#### Componentes clave a nivel de red e infraestructura Cloud-Native
+### Componentes clave a nivel de red e infraestructura Cloud-Native
 
 - **VPC (_Virtual Private Cloud_) y subredes:** División lógica de la red en subredes públicas (para los _load balancers_ e _ingress controllers_) y subredes privadas (para los trabajadores de Kubernetes y bases de datos).
 
@@ -40,11 +40,11 @@ Los proveedores de nube pública estructuran su infraestructura global en tres n
 
 - **Global Server Load Balancing (GSLB) / DNS Routing:** Mecanismos como AWS Route 53 o Cloudflare que usan _health checks_ para redirigir el tráfico del usuario a la región o AZ más cercana y saludable.
 
-#### VPC y Subredes
+### VPC y Subredes
 
 ![vpc](images/image-3-3.jpeg)
 
-### 2. Analogía del mundo real
+## 2. Analogía del mundo real
 
 Imagina que administras la logística de entregas de una importante cadena de farmacias durante una época de emergencias de salud:
 
@@ -54,11 +54,11 @@ Imagina que administras la logística de entregas de una importante cadena de fa
 
 - **Multi-Región:** Tienes centros de distribución masivos tanto en la Ciudad de México como en Monterrey. Si ocurre un terremoto o huracán que inhabilita por completo las comunicaciones en el centro del país, la sede de Monterrey toma el control y sigue enviando medicamentos al resto de las ciudades.
 
-### 3. Laboratorio
+## 3. Laboratorio
 
 Para completar esta parte, sigue el [Laboratorio de la clase 1.3](../02-laboratorio/laboratorio-clase-1-3.md). Allí encontrarás todos los pasos, código y procedimientos necesarios.
 
-### 4. Reto de ingeniería o pregunta de reflexión
+## 4. Reto de ingeniería o pregunta de reflexión
 
 **El escenario:** Diseñaste una arquitectura multi-AZ en AWS con un clúster de Kubernetes (EKS) que corre 6 réplicas de un microservicio distribuidas en 3 zonas (`us-east-1a`, `us-east-1b`, `us-east-1c`). La base de datos PostgreSQL utiliza un esquema _Primary/Secondary_ en donde la instancia primaria está en `us-east-1a` y la réplica sincrónica en `us-east-1b`.
 

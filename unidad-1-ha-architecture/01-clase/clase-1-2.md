@@ -12,25 +12,55 @@ Para evitar que una falla local destruya el sistema completo, implementamos dos 
 
 - **Circuit breaker:** Actúa como un interruptor eléctrico de seguridad. Supervisa las llamadas a un servicio externo o dependiente. Si la tasa de errores o la latencia supera un umbral definido, el circuito se abre (_open state_), cortando inmediatamente las llamadas posteriores y devolviendo una respuesta rápida de error o un _fallback_. Después de un período de enfriamiento (_cooldown_), pasa a un estado semi-abierto (_half-open_) para probar si el servicio remoto se ha recuperado.
 
-#### Circuit Breaker: Máquina de Estados
-
 ![circuit](images/image-2-1.jpeg)
+
+---
 
 - **Retry con _exponential backoff_ y _jitter_:** Reintenta operaciones fallidas de forma automática. Para no saturar un servicio que apenas se está recuperando de una caída (_retry storm_), se aplica un tiempo de espera exponencial entre reintentos (_exponential backoff_) sumado a un factor aleatorio (_jitter_) que desincroniza las peticiones concurrentes.
 
-#### Retry: Backoff Exponencial
-
 ![backoff](images/image-2-2.jpeg)
+
+---
+
+- **Timeout:** Cancela automáticamente cualquier solicitud que exceda un tiempo de respuesta máximo configurado. Evita que los clientes se bloqueen indefinidamente esperando un servidor lento o no responde. Si la solicitud no completa dentro del límite (ej. 800 ms), se lanza una excepción que puede capturarse con `@Fallback` o `@Retry`. Es fundamental para controlar la latencia en cadenas de llamadas síncronas.
+
+![timeout](images/image-2-3.jpeg)
+
+**Escenario 1 (Exitoso):** Solicitud completa en ~400ms → Cliente recibe respuesta antes del límite → HTTP 200 OK
+
+**Escenario 2 (Timeout):** Solicitud requiere >3000ms (simulado) → Se alcanza límite de 800ms → `@Timeout` cancela → Excepción lanzada → Puede capturarse con `@Retry` o `@Fallback`
+
+---
 
 - **Rate limiting:** Limita la cantidad de peticiones que un cliente o microservicio puede realizar en una ventana de tiempo específica. Protege la infraestructura contra picos de tráfico inesperados, ataques de denegación de servicio (_DoS_) y garantiza un consumo justo de recursos.
 
+![rate-limiting](images/image-2-4.jpeg)
+
+**Algoritmo común (Token Bucket):** Se regeneran tokens cada segundo. Cada solicitud consume 1 token. Si no hay tokens disponibles, se rechaza con HTTP 429.
+
+**Ventaja:** Protege el servidor de sobrecargas sin necesidad de modificar el código de negocio.
+
+---
+
 - **Bulkhead:** Inspirado en los mamparos estancos de los barcos. Divide los recursos del sistema (como _thread pools_ o _connection pools_) en compartimentos aislados. Si un _pool_ de hilos se agota por culpa de una base de datos lenta, los demás microservicios o hilos continúan operando con normalidad.
 
-#### Bulkhead: Thread Pools Aislados
 
-![backoff](images/image-2-3.jpeg)
+![backoff](images/image-2-5.jpeg)
+
+---
 
 - **Fallback:** Proporciona una ruta alternativa de degradación elegante (_graceful degradation_) cuando falla la llamada principal (por ejemplo, devolver datos guardados en caché o un valor por defecto seguro).
+
+![fallback](images/image-2-6.jpeg)
+
+**Filosofía:** Preferir una respuesta degradada pero útil (⚠️ DEGRADED_CACHE) a un error total (❌ HTTP 500).
+
+**Casos de uso:**
+- BD primaria está caída → Retorna datos en caché del servidor
+- Timeout en llamada remota → Retorna lista vacía segura o valores por defecto
+- Servicio externo en mantenimiento → Retorna últimos datos conocidos
+
+Este patrón es esencial en arquitecturas de **alta disponibilidad**, donde la tolerancia a fallas es más importante que la consistencia perfecta.
 
 ### Patrones de distribución y replicación de datos
 
@@ -46,9 +76,9 @@ Para evitar que una falla local destruya el sistema completo, implementamos dos 
 
 El _load balancing_ es fundamental para distribuir las solicitudes entre múltiples instancias saludables de un microservicio. Se puede ejecutar en el lado del servidor (_server-side load balancing_ mediante componentes como un _Ingress Controller_ o un _Load Balancer_ de nube) o en el lado del cliente (_client-side load balancing_ como el integrado en arquitecturas de _service mesh_ mediante proxies como Envoy), aplicando algoritmos como _Round Robin_, _Least Connections_ o _IP Hash_.
 
-#### Load Balancing: Estrategias
+##### Visualización: Estrategias de Load Balancing
 
-![balancing](images/image-2-4.jpeg)
+![balancing](images/image-2-7.jpeg)
 
 ## 2. Analogía del mundo real
 

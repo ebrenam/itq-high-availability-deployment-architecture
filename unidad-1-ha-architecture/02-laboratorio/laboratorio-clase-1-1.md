@@ -124,13 +124,26 @@ Crea el archivo `test-availability.sh` con el siguiente contenido:
 #!/bin/bash
 
 # Script reutilizable para medir disponibilidad
-# Genera 40 solicitudes, analiza y guarda resultados en availability-baseline.txt
+# Uso: ./test-availability.sh <nombre_archivo_salida>
+# Ejemplo para Lab 1.1: ./test-availability.sh availability-baseline.txt
+# Ejemplo para Lab 1.2: ./test-availability.sh resilience-sample.txt
 
-OUTPUT_FILE="availability-baseline.txt"
+# 1. Validar que se proporcionó el parámetro
+if [[ $# -lt 1 ]]; then
+    echo "❌ Error: Debes proporcionar el nombre del archivo de salida"
+    echo "Uso: ./test-availability.sh <nombre_archivo>"
+    echo ""
+    echo "Ejemplos:"
+    echo "  Lab 1.1: ./test-availability.sh availability-baseline.txt"
+    echo "  Lab 1.2: ./test-availability.sh resilience-sample.txt"
+    exit 1
+fi
+
+OUTPUT_FILE="$1"
 ENDPOINT_URL="http://localhost:8080/v1/products"
 NUM_REQUESTS=40
 
-# 1. Limpiar archivo de salida
+# 2. Limpiar archivo de salida
 > "$OUTPUT_FILE"
 
 echo "Ejecutando $NUM_REQUESTS solicitudes a $ENDPOINT_URL..."
@@ -168,8 +181,10 @@ Luego hazlo ejecutable y ejecuta:
 
 ```bash
 chmod +x test-availability.sh
-./test-availability.sh
+./test-availability.sh availability-baseline.txt
 ```
+
+> **Nota:** El script requiere que proporciones el nombre del archivo de salida como parámetro. Para este laboratorio usa `availability-baseline.txt`.
 
 ---
 
@@ -178,11 +193,32 @@ chmod +x test-availability.sh
 Crea el archivo `test-availability.ps1` con el código adaptado a PowerShell:
 
 ```powershell
-# 1. Definir y limpiar archivo de salida
-$outputFile = "availability-baseline.txt"
-if (Test-Path $outputFile) { Remove-Item $outputFile }
+# Script reutilizable para medir disponibilidad
+# Uso: .\test-availability.ps1 -OutputFile <nombre_archivo>
+# Ejemplo para Lab 1.1: .\test-availability.ps1 -OutputFile "availability-baseline.txt"
+# Ejemplo para Lab 1.2: .\test-availability.ps1 -OutputFile "resilience-sample.txt"
 
-Write-Host "Ejecutando 40 solicitudes..." -ForegroundColor Cyan
+param(
+    [Parameter(Mandatory=$true)]
+    [string]$OutputFile
+)
+
+# 1. Validar parámetro
+if ([string]::IsNullOrWhiteSpace($OutputFile)) {
+    Write-Host "❌ Error: Debes proporcionar el nombre del archivo de salida" -ForegroundColor Red
+    Write-Host "Uso: .\test-availability.ps1 -OutputFile <nombre_archivo>" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Ejemplos:" -ForegroundColor Cyan
+    Write-Host "  Lab 1.1: .\test-availability.ps1 -OutputFile 'availability-baseline.txt'"
+    Write-Host "  Lab 1.2: .\test-availability.ps1 -OutputFile 'resilience-sample.txt'"
+    exit 1
+}
+
+# 2. Limpiar archivo de salida
+if (Test-Path $OutputFile) { Remove-Item $OutputFile }
+
+Write-Host "Ejecutando 40 solicitudes a http://localhost:8080/v1/products" -ForegroundColor Cyan
+Write-Host "Guardando en: $OutputFile" -ForegroundColor Cyan
 
 # 2. Loop de 40 solicitudes
 for ($i = 1; $i -le 40; $i++) {
@@ -194,7 +230,7 @@ for ($i = 1; $i -le 40; $i++) {
         $body = Get-Content -Raw -Path $tempFile 2>$null | ForEach-Object { $_ -replace "`r?`n", ' ' }
         
         $line = "{0:D2} {1} {2}" -f $i, $output, $body
-        Add-Content -Path $outputFile -Value $line
+        Add-Content -Path $OutputFile -Value $line
         Write-Host $line
     }
     finally {
@@ -202,10 +238,10 @@ for ($i = 1; $i -le 40; $i++) {
     }
 }
 
-Write-Host "`nResultados guardados en: $outputFile`n" -ForegroundColor Green
+Write-Host "`nResultados guardados en: $OutputFile`n" -ForegroundColor Green
 
 # 3. Procesar métricas utilizando objetos de PowerShell en lugar de Regex frágiles
-$lines = Get-Content $outputFile
+$lines = Get-Content $OutputFile
 
 $total = $lines.Count
 $success = ($lines | Where-Object { $_ -like '*"status":"SUCCESS"*' }).Count
@@ -227,8 +263,10 @@ if ($total -gt 0) {
 Luego ejecuta en PowerShell:
 
 ```powershell
-.\test-availability.ps1
+.\test-availability.ps1 -OutputFile "availability-baseline.txt"
 ```
+
+> **Nota:** El script requiere que proporciones el nombre del archivo de salida como parámetro `-OutputFile`. Para este laboratorio usa `availability-baseline.txt`.
 
 ---
 
@@ -252,16 +290,16 @@ Una vez ejecutado el comando de medición, tu archivo debe verse aproximadamente
 > El resultado puede variar con cada ejecución.
 
 ```text
-Solicitudes totales: 40
 Respuestas SUCCESS: 26-30 (aprox.)
 Respuestas HTTP 200: 26-30 (aprox.)
 Respuestas HTTP distintas de 200: 10-14 (aprox.)
+Solicitudes totales: 40
 Disponibilidad observada: 0.65-0.75 (aprox.)
 ```
 
 **Interpretación:**
 
-- **Aproximadamente 65-70% de disponibilidad observada** (varía con cada ejecución debido a la naturaleza probabilística)
+- **Aproximadamente 65-70% de confiabilidad observable** (varía con cada ejecución debido a la naturaleza probabilística). Este valor mide la proporción de solicitudes que reciben HTTP 200 con respuesta exitosa, representando tanto la **disponibilidad** (accesibilidad del servicio) como la **confiabilidad** (cumplimiento correcto de su función sin errores).
 - **Aproximadamente 30-35% de errores HTTP 500** (varía con cada ejecución)
 - **Algunos tiempos de respuesta muy altos (cerca de 3 segundos)** debido a la simulación de latencia — observa estos valores en la columna `time_total` del archivo resultante.
 - **NO hay `DEGRADED_CACHE`:** Porque `proyecto-base-unidad-01` aún no tiene patrones de resiliencia
@@ -360,21 +398,25 @@ curl -i http://localhost:8080/v1/products
 
 **Causa común:** La simulación es probabilística; con 40 solicitudes puede no capturar suficientes fallos.
 
-![linux](images/linux.png) **Solución Linux/macOS:** Ejecuta más solicitudes:
+![linux](images/linux.png) **Solución Linux/macOS:** Ejecuta el script con más solicitudes (100 en lugar de 40):
 
 ```bash
+# Crea un loop manual para 100 solicitudes:
+OUTPUT_FILE="availability-baseline-extended.txt"
+> "$OUTPUT_FILE"
+
 for i in {1..100}; do
     response_file=$(mktemp)
     metadata=$(curl -sS -o "$response_file" -w "%{http_code} %{time_total}" http://localhost:8080/v1/products)
     body=$(cat "$response_file" | tr '\n' ' ')
-    printf '%03d %s %s\n' "$i" "$metadata" "$body"
+    printf '%03d %s %s\n' "$i" "$metadata" "$body" | tee -a "$OUTPUT_FILE"
     rm -f "$response_file"
-done | tee availability-baseline-100.txt
+done
 
-SUCCESS=$(grep -c '"status":"SUCCESS"' availability-baseline-100.txt || true)
-HTTP_200=$(grep -cE '^[0-9]+ 200 ' availability-baseline-100.txt || true)
-HTTP_ERRORS=$(grep -cEv '^[0-9]+ 200 ' availability-baseline-100.txt || true)
-TOTAL=$(wc -l < availability-baseline-100.txt | tr -d ' ')
+SUCCESS=$(grep -c '"status":"SUCCESS"' "$OUTPUT_FILE" || true)
+HTTP_200=$(grep -cE '^[0-9]+ 200 ' "$OUTPUT_FILE" || true)
+HTTP_ERRORS=$(grep -cEv '^[0-9]+ 200 ' "$OUTPUT_FILE" || true)
+TOTAL=$(wc -l < "$OUTPUT_FILE" | tr -d ' ')
 
 echo "Solicitudes totales: $TOTAL"
 echo "Respuestas SUCCESS: $SUCCESS"
@@ -383,29 +425,41 @@ echo "Respuestas HTTP distintas de 200: $HTTP_ERRORS"
 echo "Disponibilidad observada: $(echo "scale=4; $HTTP_200 / $TOTAL" | bc)"
 ```
 
-![win](images/windows.png) **Solución Windows (PowerShell):** Modifica el script anterior (Paso 3) para 100 solicitudes:
+![win](images/windows.png) **Solución Windows (PowerShell):** Ejecuta el script con más solicitudes (100 en lugar de 40):
 
 ```powershell
-# Cambiar esta línea:
-for ($i = 1; $i -le 40; $i++) {
+# Crea un loop manual para 100 solicitudes:
+$OutputFile = "availability-baseline-extended.txt"
+if (Test-Path $OutputFile) { Remove-Item $OutputFile }
 
-# A esta:
+Write-Host "Ejecutando 100 solicitudes..." -ForegroundColor Cyan
+
 for ($i = 1; $i -le 100; $i++) {
+    $tempFile = [System.IO.Path]::GetTempFileName()
+    try {
+        $output = curl.exe -sS -o $tempFile -w "%{http_code} %{time_total}" http://localhost:8080/v1/products 2>$null
+        $body = Get-Content -Raw -Path $tempFile 2>$null | ForEach-Object { $_ -replace "`r?`n", ' ' }
+        $line = "{0:D3} {1} {2}" -f $i, $output, $body
+        Add-Content -Path $OutputFile -Value $line
+        Write-Host $line
+    }
+    finally {
+        Remove-Item -Force $tempFile -ErrorAction SilentlyContinue
+    }
+}
 
-# Y guarda con un nuevo nombre:
-$outputFile = "availability-baseline-100.txt"
+Write-Host "`nResultados guardados en: $OutputFile`n" -ForegroundColor Green
+
+# Luego analiza con:
+$lines = Get-Content $OutputFile
+$total = $lines.Count
+$http200 = ($lines | Where-Object { $_ -match '^\d+\s+200\s+' }).Count
+$http500 = ($lines | Where-Object { $_ -match '^\d+\s+500\s+' }).Count
+
+Write-Host "Total: $total" -ForegroundColor Cyan
+Write-Host "HTTP 200: $http200" -ForegroundColor Green
+Write-Host "HTTP 500: $http500" -ForegroundColor Red
 ```
-
-Luego analiza con:
-
-```powershell
-$total = @(Get-Content availability-baseline-100.txt | Measure-Object -Line).Lines
-$http200 = @(Select-String -Path availability-baseline-100.txt -Pattern '^\d+ 200 ' | Measure-Object).Count
-$http500 = @(Select-String -Path availability-baseline-100.txt -Pattern '^\d+ 500 ' | Measure-Object).Count
-
-Write-Host "Total: $total"
-Write-Host "HTTP 200: $http200"
-Write-Host "HTTP 500: $http500"
 ```
 
 ---
