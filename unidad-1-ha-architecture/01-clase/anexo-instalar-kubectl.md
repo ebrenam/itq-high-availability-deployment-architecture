@@ -4,7 +4,7 @@
 
 ---
 
-## Verificación Rápida
+## Verificación rápida
 
 Si ya tienes `kubectl` instalado, verifica la versión:
 
@@ -64,7 +64,7 @@ EOF
 sudo yum install -y kubectl
 ```
 
-### Instalación Manual (todos los Linux)
+### Instalación manual (todos los Linux)
 
 Si prefieres instalar manualmente sin gestor de paquetes:
 
@@ -92,7 +92,7 @@ kubectl version --client
 
 ## Opción 2: macOS
 
-### Con Homebrew (Recomendado)
+### Con Homebrew (recomendado)
 
 ```bash
 # Instalar Homebrew si no lo tienes
@@ -132,7 +132,7 @@ kubectl version --client
 
 ## Opción 3: Windows
 
-### Opción 3.1: Usando Chocolatey (Recomendado)
+### Opción 3.1: Usando Chocolatey (recomendado)
 
 Si tienes Chocolatey instalado:
 
@@ -146,7 +146,7 @@ Luego verifica:
 kubectl version --client
 ```
 
-### Opción 3.2: Descargas Directas (Manual)
+### Opción 3.2: Descargas directas (manual)
 
 1. **Descargar ejecutable:**
    - Ve a: https://dl.k8s.io/release/stable.txt para obtener la versión más reciente
@@ -167,7 +167,7 @@ kubectl version --client
    kubectl version --client
    ```
 
-### Opción 3.3: PowerShell Script (Automático)
+### Opción 3.3: PowerShell Script (automático)
 
 ```powershell
 # Descargar y instalar automáticamente
@@ -255,9 +255,9 @@ kubectl config view
 
 ---
 
-## Pruebas de Conectividad
+## Pruebas de conectividad
 
-### Prueba 1: Información del Cluster
+### Prueba 1: Información del cluster
 
 ```bash
 kubectl cluster-info
@@ -269,7 +269,7 @@ Kubernetes control plane is running at https://127.0.0.1:8443
 CoreDNS is running at https://127.0.0.1:8443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
 ```
 
-### Prueba 2: Listar Nodos
+### Prueba 2: Listar nodos
 
 ```bash
 kubectl get nodes
@@ -281,7 +281,7 @@ NAME       STATUS   ROLES           AGE   VERSION
 minikube   Ready    control-plane   5m    v1.28.0
 ```
 
-### Prueba 3: Listar Pods del Sistema
+### Prueba 3: Listar pods del sistema
 
 ```bash
 kubectl get pods -A
@@ -419,7 +419,7 @@ Nota: Pequeñas diferencias (1.28 vs 1.26) generalmente son toleradas. Diferenci
 
 ---
 
-## Alias Útiles (Opcional)
+## Alias útiles (opcional)
 
 Puedes crear alias para comandos frecuentes. Agrega a `~/.bashrc`, `~/.zshrc` o `$PROFILE` en PowerShell:
 

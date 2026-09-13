@@ -4,7 +4,7 @@ Este documento te guía para instalar un clúster Kubernetes local en tu máquin
 
 ---
 
-## Opción 1: Minikube (Recomendado para Linux/macOS)
+## Opción 1: Minikube (recomendado para Linux/macOS)
 
 Minikube es la opción más simple para crear un clúster Kubernetes de un solo nodo localmente.
 
@@ -56,7 +56,7 @@ minikube dashboard
 
 ---
 
-## Opción 2: Kind (Recomendado para Windows + WSL)
+## Opción 2: Kind (recomendado para Windows + WSL)
 
 Kind (Kubernetes in Docker) es ligero y funciona bien en Windows con WSL.
 
@@ -102,7 +102,7 @@ kind delete cluster --name local-cluster
 
 ---
 
-## Opción 3: Docker Desktop (Simple pero menos educativo)
+## Opción 3: Docker Desktop (simple pero menos educativo)
 
 Si ya tienes Docker Desktop instalado, puedes habilitar Kubernetes integrado.
 
@@ -130,7 +130,7 @@ kubectl get nodes
 
 ---
 
-## Verificación General (Todas las Opciones)
+## Verificación General (todas las opciones)
 
 Después de instalar cualquier opción, verifica que todo funciona:
 
@@ -199,7 +199,7 @@ kind create cluster --name local-cluster
 
 ---
 
-## Tamaño de Almacenamiento
+## Tamaño de almacenamiento
 
 - **Minikube:** ~5-10 GB (varía según driver)
 - **Kind:** ~2-3 GB
