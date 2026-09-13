@@ -20,6 +20,10 @@ Para evitar que una falla local destruya el sistema completo, implementamos dos 
 
 ![backoff](images/image-2-2.jpeg)
 
+> **NOTA PEDAGÓGICA**
+>
+> En el [Laboratorio 1.2](../02-laboratorio/laboratorio-clase-1-2.md), la implementación de `@Retry` usa un `delay` fijo (150ms) por simplicidad didáctica. La versión con _exponential backoff_ real (ej. 150ms → 300ms → 600ms) y _jitter_ se cubre en [Unidad 4 - CI/CD y Automación](../../unidad-4-ci-cd/). Para esta unidad, el delay fijo es suficiente para demostrar el concepto de reintentos y protección contra fallos transitorios.
+
 ---
 
 - **Timeout:** Cancela automáticamente cualquier solicitud que exceda un tiempo de respuesta máximo configurado. Evita que los clientes se bloqueen indefinidamente esperando un servidor lento o no responde. Si la solicitud no completa dentro del límite (ej. 800 ms), se lanza una excepción que puede capturarse con `@Fallback` o `@Retry`. Es fundamental para controlar la latencia en cadenas de llamadas síncronas.

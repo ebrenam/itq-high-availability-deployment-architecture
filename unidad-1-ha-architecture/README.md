@@ -12,19 +12,24 @@
 
 ```text
 unidad-1-ha-architecture/
-├── glosario.md                      # Diccionario de términos
 ├── README.md                        # Este archivo
 │
 ├── 01-clase/                        # TEORÍA — Conceptos y principios
 │   ├── clase-1-1.md                 # Disponibilidad, confiabilidad, SLI/SLO/SLA
 │   ├── clase-1-2.md                 # Patrones: Timeout, Retry, CircuitBreaker, Fallback
 │   ├── clase-1-3.md                 # Multi-AZ, Kubernetes, autocuración
+│   ├── nota-01.md                   # Notas complementarias
+│   ├── nota-02.md                   # Notas complementarias
+│   ├── glosario.md                  # Diccionario de términos
+│   ├── anexo-kubernetes-local.md    # Guía: Instalar Minikube, Kind, Docker Desktop
+│   ├── anexo-instalar-kubectl.md    # Guía: Instalar kubectl en Linux, macOS, Windows
 │   └── images/                      # Diagramas conceptuales
 │
 ├── 02-laboratorio/                  # PRÁCTICA — Implementación hands-on
 │   ├── laboratorio-clase-1-1.md     # Lab 1.1: Medir línea base (~70% disponibilidad)
 │   ├── laboratorio-clase-1-2.md     # Lab 1.2: Implementar patrones (~90%+ disponibilidad)
 │   ├── laboratorio-clase-1-3.md     # Lab 1.3: Desplegar en Kubernetes (~99%+ disponibilidad)
+│   ├── images/                      # Screenshots y diagramas de laboratorios
 │   │
 │   └── proyecto-base-unidad-01/     # CÓDIGO FUNCIONAL — Catalog Service
 │       └── catalog-service/         # Microservicio resiliente
