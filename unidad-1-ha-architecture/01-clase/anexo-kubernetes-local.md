@@ -1,84 +1,73 @@
 # Anexo: Instalar Kubernetes Local
 
-Este documento te guía para instalar un clúster Kubernetes local en tu máquina. Elige la opción que mejor se adapte a tu sistema operativo.
+Este documento te guía para instalar un clúster Kubernetes local en tu máquina. Elige la opción que mejor se adapte a tu sistema operativo y preferencias.
 
 ---
 
-## Opción 1: Minikube (recomendado para Linux/macOS)
+## 📊 Matriz Comparativa por Sistema Operativo
 
-Minikube es la opción más simple para crear un clúster Kubernetes de un solo nodo localmente.
+Antes de elegir, consulta esta tabla para ver qué funciona mejor en tu SO:
 
-### Instalación en Linux
+| **SO** | **Minikube** | **Kind** | **Docker Desktop** |
+|--------|---|---|---|
+| **Linux** | ✅ Recomendado (más rápido) | ✅ Alternativa (más ligero) | ❌ No disponible |
+| **macOS** | ✅ Muy recomendado (fácil con Homebrew) | ✅ Alternativa | ✅ Alternativa |
+| **Windows 11+ Pro/Enterprise (Hyper-V)** | ⚠️ Factible (requiere Hyper-V) | ✅ Recomendado (WSL) | ✅ Recomendado |
+| **Windows 11 Home (sin Hyper-V)** | ⚠️ Factible (requiere VirtualBox) | ✅ Recomendado (WSL) | ⚠️ Requiere upgrade |
+
+**Recomendación rápida:**
+- ![linux](images/linux.png) **Linux:** Minikube
+- 🍎 **macOS:** Minikube (o Docker Desktop si ya lo usas)
+- ![win](images/windows.png) **Windows:** Kind + WSL2 (más simple que Minikube)
+
+---
+
+## Instalación por Sistema Operativo
+
+### ![linux](images/linux.png) Linux
+
+#### Opción A: Minikube (Recomendada)
 
 ```bash
-# Descarga el binario de Minikube
+# Descarga el binario
 curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
 sudo install minikube-linux-amd64 /usr/local/bin/minikube
 
-# Inicia Minikube (usa VirtualBox, KVM, Docker o Podman como driver)
+# Inicia con Docker (más rápido)
 minikube start --driver=docker
-# O si prefieres otro driver:
+
+# O con otro driver si prefieres:
 # minikube start --driver=virtualbox
 # minikube start --driver=kvm2
+# minikube start --driver=podman
 ```
 
-### Instalación en macOS
-
-```bash
-# Usa Homebrew (recomendado)
-brew install minikube
-
-# O descarga el binario manualmente
-curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-darwin-arm64  # Para Apple Silicon
-curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-darwin-amd64  # Para Intel
-
-# Otorga permisos ejecutables
-chmod +x minikube-darwin-*
-sudo mv minikube-darwin-* /usr/local/bin/minikube
-
-# Inicia Minikube
-minikube start --driver=docker
-```
-
-### Verificación
-
+**Verificación:**
 ```bash
 minikube version
-kubectl cluster-info
 minikube status
+kubectl cluster-info
+minikube dashboard  # Ver dashboard (opcional)
 ```
 
-### Acceso al Dashboard (opcional)
+**Dashboard (opcional):**
+El dashboard de Minikube es una interfaz web gráfica para ver tu clúster. Úsalo para visualizar:
+- Pods, Deployments, Services corriendo
+- Consumo de recursos
+- Logs de contenedores
 
 ```bash
+# Abre automáticamente el dashboard en tu navegador
 minikube dashboard
+
+# Si no se abre automáticamente, copia la URL que se imprime en terminal
+# y abrela manualmente en tu navegador
 ```
 
----
-
-## Opción 2: Kind (recomendado para Windows + WSL)
-
-Kind (Kubernetes in Docker) es ligero y funciona bien en Windows con WSL.
-
-### Instalación en Windows + WSL
+#### Opción B: Kind (Alternativa ligera)
 
 ```bash
-# Dentro de WSL, descarga el binario de Kind
-wget https://github.com/kubernetes-sigs/kind/releases/latest/download/kind-linux-amd64
-chmod +x kind-linux-amd64
-sudo mv kind-linux-amd64 /usr/local/bin/kind
-
-# Crea un clúster Kind
-kind create cluster --name local-cluster
-```
-
-### Instalación en Linux/macOS
-
-```bash
-# Usa Homebrew (para macOS y algunos sistemas Linux)
-brew install kind
-
-# O descarga manualmente
+# Descarga Kind
 curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
 chmod +x ./kind
 sudo mv ./kind /usr/local/bin/kind
@@ -87,45 +76,167 @@ sudo mv ./kind /usr/local/bin/kind
 kind create cluster --name local-cluster
 ```
 
-### Verificación
-
+**Verificación:**
 ```bash
 kind version
 kubectl cluster-info --context kind-local-cluster
 ```
 
-### Eliminar el Clúster
+---
+
+### 🍎 macOS
+
+#### Opción A: Minikube (Recomendada)
 
 ```bash
-kind delete cluster --name local-cluster
+# Usa Homebrew (más fácil)
+brew install minikube
+
+# O descarga manualmente
+# Para Apple Silicon (M1/M2/M3):
+curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-darwin-arm64
+# Para Intel:
+curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-darwin-amd64
+
+# Si descargaste manualmente:
+chmod +x minikube-darwin-*
+sudo mv minikube-darwin-* /usr/local/bin/minikube
+
+# Inicia Minikube
+minikube start --driver=docker
+```
+
+**Verificación:**
+```bash
+minikube version
+minikube status
+kubectl cluster-info
+```
+
+**Dashboard (opcional):**
+El dashboard de Minikube es una interfaz web gráfica para ver tu clúster. Úsalo para visualizar:
+- Pods, Deployments, Services corriendo
+- Consumo de recursos
+- Logs de contenedores
+
+```bash
+# Abre automáticamente el dashboard en tu navegador
+minikube dashboard
+
+# Si no se abre automáticamente, copia la URL que se imprime en terminal
+# y abrela manualmente en tu navegador
+```
+
+#### Opción B: Kind
+
+```bash
+# Usa Homebrew
+brew install kind
+
+# O descarga manualmente
+curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-darwin-arm64  # Apple Silicon
+# O
+curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-darwin-amd64   # Intel
+
+chmod +x ./kind
+sudo mv ./kind /usr/local/bin/kind
+
+# Crea un clúster
+kind create cluster --name local-cluster
+```
+
+#### Opción C: Docker Desktop (si ya lo tienes)
+
+1. Abre **Docker Desktop** → **Preferences**
+2. Ve a **Kubernetes**
+3. Marca **"Enable Kubernetes"**
+4. Click en **"Apply & Restart"**
+5. Espera 2-3 minutos
+
+**Verificación:**
+```bash
+kubectl cluster-info
 ```
 
 ---
 
-## Opción 3: Docker Desktop (simple pero menos educativo)
+### ![win](images/windows.png) Windows
 
-Si ya tienes Docker Desktop instalado, puedes habilitar Kubernetes integrado.
+#### Opción A: Kind + WSL2 (Recomendada)
 
-### En macOS
+**Prerrequisito:** Tener WSL2 instalado.
 
-1. Abre **Docker Desktop** → **Preferences**
-2. Ve a **Kubernetes**
-3. Marca la opción **"Enable Kubernetes"**
-4. Click en **"Apply & Restart"**
-5. Espera a que inicie (puede tomar 2-3 minutos)
+```powershell
+# En PowerShell como Administrador
 
-### En Windows
+# Descarga Kind
+curl -Lo kind.exe https://kind.sigs.k8s.io/dl/v0.20.0/kind-windows-amd64
+# Mueve a un directorio en PATH, por ejemplo:
+Move-Item .\kind.exe 'C:\Program Files\kind.exe'
+
+# Verifica
+kind version
+
+# Crea un clúster
+kind create cluster --name local-cluster
+```
+
+Luego en **WSL2 terminal:**
+```bash
+# Dentro de WSL2, kubectl ya debería funcionar
+kubectl cluster-info --context kind-local-cluster
+```
+
+#### Opción B: Minikube con Hyper-V (Windows 11 Pro/Enterprise)
+
+```powershell
+# En PowerShell como Administrador
+
+# Habilita Hyper-V (si no está ya habilitado)
+Enable-WindowsOptionalFeature -FeatureName Microsoft-Hyper-V-All -Online
+
+# Descarga Minikube
+curl -Lo minikube.exe https://github.com/kubernetes/minikube/releases/latest/download/minikube-windows-amd64
+Move-Item .\minikube.exe 'C:\Program Files\minikube.exe'
+
+# Inicia con Hyper-V
+minikube start --driver=hyperv
+
+# Verifica
+minikube status
+kubectl cluster-info
+```
+
+#### Opción C: Minikube con VirtualBox (Cualquier Windows)
+
+```powershell
+# En PowerShell como Administrador
+
+# Descarga VirtualBox desde https://www.virtualbox.org/
+# (Instala manualmente)
+
+# Descarga Minikube
+curl -Lo minikube.exe https://github.com/kubernetes/minikube/releases/latest/download/minikube-windows-amd64
+Move-Item .\minikube.exe 'C:\Program Files\minikube.exe'
+
+# Inicia con VirtualBox
+minikube start --driver=virtualbox
+
+# Verifica
+minikube status
+kubectl cluster-info
+```
+
+#### Opción D: Docker Desktop (si ya lo tienes)
 
 1. Abre **Docker Desktop** → **Settings**
 2. Ve a **Kubernetes**
 3. Marca **"Enable Kubernetes"**
 4. Click en **"Apply & Restart"**
 
-### Verificación
-
+**Verificación:**
 ```bash
 kubectl cluster-info
-kubectl get nodes
 ```
 
 ---
