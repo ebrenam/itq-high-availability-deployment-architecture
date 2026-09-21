@@ -13,7 +13,8 @@ kubectl version --client
 ```
 
 Deberías ver algo como:
-```
+
+```bash
 Client Version: v1.28.0
 Kustomize Version: v5.0.0
 ```
@@ -22,7 +23,7 @@ Si obtienes un error, procede con la instalación según tu SO.
 
 ---
 
-## Opción 1: Linux
+## ![linux](images/linux.png) Linux
 
 ### Ubuntu/Debian
 
@@ -46,6 +47,8 @@ sudo apt-get update
 sudo apt-get install -y kubectl
 ```
 
+---
+
 ### Fedora/RHEL/CentOS
 
 ```bash
@@ -63,6 +66,8 @@ EOF
 # Instalar kubectl
 sudo yum install -y kubectl
 ```
+
+---
 
 ### Instalación manual (todos los Linux)
 
@@ -90,9 +95,9 @@ kubectl version --client
 
 ---
 
-## Opción 2: macOS
+## ![applelinux](images/apple.png) macOS
 
-### Con Homebrew (recomendado)
+### Opción A: Con Homebrew (recomendado)
 
 ```bash
 # Instalar Homebrew si no lo tienes
@@ -105,7 +110,7 @@ brew install kubectl
 kubectl version --client
 ```
 
-### Instalación Manual
+### Opción B: Instalación Manual
 
 ```bash
 # Determinar arquitectura (Intel o Apple Silicon)
@@ -130,9 +135,9 @@ kubectl version --client
 
 ---
 
-## Opción 3: Windows
+## ![win](images/windows.png) Windows
 
-### Opción 3.1: Usando Chocolatey (recomendado)
+### Opción A: Usando Chocolatey (recomendado)
 
 Si tienes Chocolatey instalado:
 
@@ -146,7 +151,7 @@ Luego verifica:
 kubectl version --client
 ```
 
-### Opción 3.2: Descargas directas (manual)
+### Opción B: Descargas directas (manual)
 
 1. **Descargar ejecutable:**
    - Ve a: https://dl.k8s.io/release/stable.txt para obtener la versión más reciente
@@ -167,7 +172,7 @@ kubectl version --client
    kubectl version --client
    ```
 
-### Opción 3.3: PowerShell Script (automático)
+### Opción C: PowerShell Script (automático)
 
 ```powershell
 # Descargar y instalar automáticamente
@@ -229,6 +234,7 @@ kubectl cluster-info
 2. Ve a Preferences → Kubernetes → Enable Kubernetes
 3. Espera a que se inicie
 4. Verifica:
+
    ```bash
    kubectl cluster-info
    ```
@@ -238,12 +244,14 @@ kubectl cluster-info
 El archivo `kubeconfig` se almacena típicamente en:
 
 **Linux/macOS:**
-```
+
+```bash
 ~/.kube/config
 ```
 
 **Windows (PowerShell):**
-```
+
+```powershell
 $env:USERPROFILE\.kube\config
 ```
 
@@ -264,6 +272,7 @@ kubectl cluster-info
 ```
 
 Deberías ver algo como:
+
 ```
 Kubernetes control plane is running at https://127.0.0.1:8443
 CoreDNS is running at https://127.0.0.1:8443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
@@ -276,6 +285,7 @@ kubectl get nodes
 ```
 
 Deberías ver al menos un nodo:
+
 ```
 NAME       STATUS   ROLES           AGE   VERSION
 minikube   Ready    control-plane   5m    v1.28.0
@@ -308,6 +318,7 @@ Deberías ver una lista de recursos disponibles (Deployments, Services, Pods, et
 **Soluciones:**
 
 **Linux/macOS:**
+
 ```bash
 # Verifica si existe
 which kubectl
@@ -318,6 +329,7 @@ sudo ln -s /ruta/a/kubectl /usr/local/bin/kubectl
 ```
 
 **Windows:**
+
 ```powershell
 # Verifica si existe
 where.exe kubectl
@@ -335,18 +347,21 @@ where.exe kubectl
 **Solución:**
 
 **Si usas Minikube:**
+
 ```bash
 minikube start
 kubectl cluster-info
 ```
 
 **Si usas Kind:**
+
 ```bash
 kind create cluster
 kubectl cluster-info
 ```
 
 **Si usas Docker Desktop:**
+
 - Abre Docker Desktop
 - Verifica que Kubernetes está habilitado en Preferences → Kubernetes
 - Espera a que se inicialice completamente

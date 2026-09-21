@@ -4,7 +4,7 @@ Este documento te guía para instalar un clúster Kubernetes local en tu máquin
 
 ---
 
-## 📊 Matriz Comparativa por Sistema Operativo
+## 📊 Matriz comparativa por Sistema Operativo
 
 Antes de elegir, consulta esta tabla para ver qué funciona mejor en tu SO:
 
@@ -17,7 +17,7 @@ Antes de elegir, consulta esta tabla para ver qué funciona mejor en tu SO:
 
 **Recomendación rápida:**
 - ![linux](images/linux.png) **Linux:** Minikube
-- 🍎 **macOS:** Minikube (o Docker Desktop si ya lo usas)
+- ![applelinux](images/apple.png) **macOS:** Minikube (o Docker Desktop si ya lo usas)
 - ![win](images/windows.png) **Windows:** Kind + WSL2 (más simple que Minikube)
 
 ---
@@ -84,7 +84,7 @@ kubectl cluster-info --context kind-local-cluster
 
 ---
 
-### 🍎 macOS
+### ![applelinux](images/apple.png) macOS
 
 #### Opción A: Minikube (Recomendada)
 
@@ -241,7 +241,7 @@ kubectl cluster-info
 
 ---
 
-## Verificación General (todas las opciones)
+## Verificación general (todas las opciones)
 
 Después de instalar cualquier opción, verifica que todo funciona:
 
