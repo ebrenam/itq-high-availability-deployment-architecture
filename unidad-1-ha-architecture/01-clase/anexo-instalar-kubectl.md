@@ -110,7 +110,7 @@ brew install kubectl
 kubectl version --client
 ```
 
-### Opción B: Instalación Manual
+### Opción B: Instalación manual
 
 ```bash
 # Determinar arquitectura (Intel o Apple Silicon)

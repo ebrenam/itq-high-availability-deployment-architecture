@@ -1,4 +1,4 @@
-# 2.1 Arquitectura y Componentes Clave
+# 2.1 Arquitectura y componentes clave
 
 En la sesión anterior analizamos cómo estructurar la infraestructura _multi-AZ_ y tolerante a fallos en la nube, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar la arquitectura interna y componentes clave de Kubernetes.
 
@@ -8,7 +8,7 @@ Kubernetes funciona mediante una arquitectura distribuida basada en un modelo de
 
 Para lograr esto, la arquitectura se divide limpiamente en dos planos de responsabilidad:
 
-#### Plano de control (_Control Plane_)
+#### Plano de Control (_Control Plane_)
 
 Es el cerebro del clúster. Toma las decisiones de orquestación, detecta eventos y reacciona ante fallos de infraestructura:
 
@@ -20,7 +20,7 @@ Es el cerebro del clúster. Toma las decisiones de orquestación, detecta evento
 
 - **kube-controller-manager:** El motor de la reconciliación. Ejecuta múltiples procesos controladores en segundo plano (como `DeploymentController`, `NodeController` o `ReplicaSetController`). Compara constantemente el estado real del clúster contra el estado deseado almacenado en `etcd`.
 
-#### Plano de trabajo (_Worker Nodes_)
+#### Plano de Trabajo (_Worker Nodes_)
 
 Son las máquinas (físicas o virtuales) donde se ejecutan realmente nuestras aplicaciones dentro de contenedores:
 
@@ -30,7 +30,7 @@ Son las máquinas (físicas o virtuales) donde se ejecutan realmente nuestras ap
 
 - **Container Runtime:** El motor subyacente que ejecuta los contenedores (como `containerd` o `CRI-O`). Recibe las órdenes del `kubelet` a través de la interfaz estándar `CRI` (_Container Runtime Interface_).
 
-#### Tabla Comparativa: Componentes del Control Plane vs. Worker Nodes
+#### Tabla comparativa: Componentes del Control Plane vs. Worker Nodes
 
 | Componente | Ubicación | Responsabilidad | Rol Análogo |
 |---|---|---|---|
@@ -42,7 +42,7 @@ Son las máquinas (físicas o virtuales) donde se ejecutan realmente nuestras ap
 | **kube-proxy** | Worker Node | Gestiona reglas de red y tráfico | Sistema de pasillos/elevadores |
 | **Container Runtime** | Worker Node | Descarga y ejecuta contenedores | Personal de limpieza |
 
-#### Modelo de red plano (_Flat Network Model_)
+#### Modelo de Red Plana (_Flat Network Model_)
 
 Kubernetes impone un modelo de red fundamental conocido como "IP por Pod" (_IP-per-Pod model_):
 

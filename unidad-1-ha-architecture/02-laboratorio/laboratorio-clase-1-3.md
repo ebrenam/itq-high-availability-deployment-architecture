@@ -52,9 +52,9 @@ Si no tienes Kubernetes instalado, sigue las instrucciones en el [Anexo: Instala
 
 ---
 
-## Paso 2: Construir la Imagen Docker y subirla a Docker Hub
+## Paso 2: Construir la imagen Docker y subirla a Docker Hub
 
-### 2.1: Compilar y Construir Imagen
+### 2.1: Compilar y construir imagen
 
 Compila y empaqueta tu código:
 
@@ -116,7 +116,7 @@ docker pull <TU_USUARIO>/catalog-service:1.0.0
 
 Ahora desplegarás tu aplicación en Kubernetes **descargándola desde tu repositorio en Docker Hub**.
 
-### 3.1: Revisar Archivos YAML en k8s/
+### 3.1: Revisar archivos YAML en k8s/
 
 Verifica que los archivos existen:
 
@@ -209,7 +209,7 @@ livenessProbe:
 >
 > La transición de "validar manualmente" (Lab 1.1) a "validar automáticamente" (Lab 1.3) es clave. Sin health checks, Kubernetes no sabría que un pod está fallando.
 
-### 3.5: Aplicar Manifiestos en Kubernetes
+### 3.5: Aplicar manifiestos en Kubernetes
 
 Ahora usa los archivos YAML para desplegar. Kubernetes automáticamente validará los health checks:
 
@@ -347,7 +347,7 @@ kubectl delete service catalog-service
 
 ---
 
-## Conclusión y Próximos Pasos
+## Conclusión y próximos pasos
 
 Has completado tres laboratorios que forman la base de Unidad 1:
 
@@ -357,7 +357,7 @@ Has completado tres laboratorios que forman la base de Unidad 1:
 | **Lab 1.2** | Implementar resiliencia de software | Code con `@Timeout`, `@Retry`, `@CircuitBreaker`, `@Fallback` |
 | **Lab 1.3** | Empaquetar y orquestar con Kubernetes | `catalog-service:1.0.0` desplegado localmente |
 
-### Conceptos que Seguirán Evolucionando en Unidad 2
+### Conceptos que seguirán evolucionando en unidad 2
 
 ✅ **Ya conoces:**
 - Resiliencia de software (patrones en código Java con `@Timeout`, `@Retry`, `@CircuitBreaker`, `@Fallback`)
@@ -372,7 +372,7 @@ Has completado tres laboratorios que forman la base de Unidad 1:
 - Estrategias avanzadas de actualización (RollingUpdate, Blue-Green)
 - Observabilidad y métricas en Kubernetes
 
-### El Aprendizaje es Incremental
+### El aprendizaje es incremental
 
 No es coincidencia que Lab 1.3 sea simple. **Vas a reutilizar todo esto en Unidad 2:**
 
@@ -390,11 +390,11 @@ Lab 2.3 (OPT): Crear nuevo microservicio aplicando todo
 
 ---
 
-## Criterios de Aceptación
+## Criterios de aceptación
 
 Para completar Lab 1.3, el estudiante debe demostrar:
 
-### Evidencia Mínima
+### Evidencia mínima
 
 1. **Imagen Construida y Publicada en Docker Hub:**
    ```bash
@@ -434,7 +434,7 @@ Para completar Lab 1.3, el estudiante debe demostrar:
    - Captura mostrando respuestas JSON con `status: SUCCESS` o `status: DEGRADED_CACHE` en `/v1/products`
    - Capturas de `/health`, `/ready`, `/live` mostrando `status: UP`
 
-### Explicación Técnica Integrada (máximo 200 palabras)
+### Explicación técnica integrada (máximo 200 palabras)
 
 Explica el flujo completo que seguiste:
 
@@ -461,7 +461,7 @@ Este es el flujo: Build local → Push a registry → Deploy con declaración de
 
 ---
 
-## Reflexión Final
+## Reflexión final
 
 En Unidad 1 aprendiste:
 - **Teoría:** Conceptos de disponibilidad, SLAs, patrones de resiliencia

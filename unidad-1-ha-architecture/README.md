@@ -46,16 +46,16 @@ unidad-1-ha-architecture/
 │           └── target/                       # Build artifacts
 ```
 
-## Contenido de Clases
+## Contenido de clases
 
-### **1.1 Fundamentos de Disponibilidad y Confiabilidad**
+### **1.1 Fundamentos de disponibilidad y confiabilidad**
 - Conceptos: Disponibilidad vs. Confiabilidad
 - Métricas: SLI, SLO, SLA, MTTR, MTTF, MTBF
 - Puntos únicos de fallo (SPOF)
 - Error budgets
 - **Laboratorio:** Medir baseline sin patrones
 
-### **1.2 Patrones de Diseño para Resiliencia**
+### **1.2 Patrones de diseño para resiliencia**
 - Timeout: Cancela operaciones lentas
 - Retry: Reintenta automáticamente
 - Circuit Breaker: Protege contra cascadas

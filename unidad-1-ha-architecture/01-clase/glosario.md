@@ -1,4 +1,4 @@
-# 📖 GLOSARIO: Unidad 1 — Términos Técnicos
+# GLOSARIO: Unidad 1 — Términos Técnicos
 
 ## A
 
@@ -537,7 +537,7 @@ Ver [Availability Zone](#availability-zone-az)
 
 ---
 
-## 🔗 Referencias Cruzadas
+## Referencias cruzadas
 
 **Conceptos relacionados a:**
 
