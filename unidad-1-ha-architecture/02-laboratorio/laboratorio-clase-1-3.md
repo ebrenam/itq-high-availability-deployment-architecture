@@ -63,10 +63,10 @@ cd unidad-1-ha-architecture/02-laboratorio/proyecto-base-unidad-01/catalog-servi
 ./mvnw clean package -DskipTests
 ```
 
-Constituye la imagen Docker con tu usuario de Docker Hub (reemplaza `<TU_USUARIO>`):
+Constituye la imagen Docker con tu usuario de Docker Hub (reemplaza `<tu-usuario-dockerhub>`):
 
 ```bash
-docker build -t <TU_USUARIO>/catalog-service:1.0.0 .
+docker build -t <tu-usuario-dockerhub>/catalog-service:1.0.0 .
 ```
 
 **Ejemplo si tu usuario es `john-doe`:**
@@ -87,12 +87,12 @@ docker login
 Ahora sube la imagen:
 
 ```bash
-docker push <TU_USUARIO>/catalog-service:1.0.0
+docker push <tu-usuario-dockerhub>/catalog-service:1.0.0
 ```
 
 **Verificar en Docker Hub:**
 
-- Ve a `https://hub.docker.com/r/<TU_USUARIO>/catalog-service`
+- Ve a `https://hub.docker.com/r/<tu-usuario-dockerhub>/catalog-service`
 - Deberías ver el tag `1.0.0` disponible
 
 ### 2.3: Verificar que descargues desde Docker Hub
@@ -100,14 +100,14 @@ docker push <TU_USUARIO>/catalog-service:1.0.0
 Elimina la imagen local y verifica que puedes descargarla de hub:
 
 ```bash
-docker image rm <TU_USUARIO>/catalog-service:1.0.0
+docker image rm <tu-usuario-dockerhub>/catalog-service:1.0.0
 ```
 
 Ahora descárgala desde hub:
 
 ```bash
-docker pull <TU_USUARIO>/catalog-service:1.0.0
-# Deberías ver: "Status: Downloaded newer image for <TU_USUARIO>/catalog-service:1.0.0"
+docker pull <tu-usuario-dockerhub>/catalog-service:1.0.0
+# Deberías ver: "Status: Downloaded newer image for <tu-usuario-dockerhub>/catalog-service:1.0.0"
 ```
 
 ---
@@ -139,7 +139,7 @@ image: catalog-service:1.0.0
 Cámbiala a tu imagen en Docker Hub:
 
 ```yaml
-image: <TU_USUARIO>/catalog-service:1.0.0
+image: <tu-usuario-dockerhub>/catalog-service:1.0.0
 ```
 
 **Ejemplo si tu usuario es `john-doe`:**
@@ -302,8 +302,8 @@ kubectl describe pod <nombre-del-pod>
 # Events:
 #   Type    Reason     Age    Message
 #   ----    ------     ---    -------
-#   Normal  Pulling    2m10s  Pulling image "<TU_USUARIO>/catalog-service:1.0.0"
-#   Normal  Pulled     2m05s  Successfully pulled image "<TU_USUARIO>/catalog-service:1.0.0"
+#   Normal  Pulling    2m10s  Pulling image "<tu-usuario-dockerhub>/catalog-service:1.0.0"
+#   Normal  Pulled     2m05s  Successfully pulled image "<tu-usuario-dockerhub>/catalog-service:1.0.0"
 #   Normal  Created    2m05s  Created container catalog-service
 #   Normal  Started    2m05s  Started container catalog-service
 ```
@@ -398,16 +398,16 @@ Para completar Lab 1.3, el estudiante debe demostrar:
 
 1. **Imagen Construida y Publicada en Docker Hub:**
    ```bash
-   docker build -t <TU_USUARIO>/catalog-service:1.0.0 .
-   docker push <TU_USUARIO>/catalog-service:1.0.0
+   docker build -t <tu-usuario-dockerhub>/catalog-service:1.0.0 .
+   docker push <tu-usuario-dockerhub>/catalog-service:1.0.0
    ```
    - Captura de `docker push` mostrando carga exitosa
-   - Acceso a `https://hub.docker.com/r/<TU_USUARIO>/catalog-service` mostrando tag `1.0.0`
+   - Acceso a `https://hub.docker.com/r/<tu-usuario-dockerhub>/catalog-service` mostrando tag `1.0.0`
 
 2. **YAML Actualizado con tu Repositorio:**
    ```bash
    cat k8s/01-deployment.yaml | grep "image:"
-   # Debe mostrar: image: <TU_USUARIO>/catalog-service:1.0.0
+   # Debe mostrar: image: <tu-usuario-dockerhub>/catalog-service:1.0.0
    ```
    - Captura del contenido de `k8s/01-deployment.yaml` mostrando tu usuario en el campo `image`
 
@@ -438,7 +438,7 @@ Para completar Lab 1.3, el estudiante debe demostrar:
 
 Explica el flujo completo que seguiste:
 
-1. **Build local:** Compilaste con Maven y Docker, generando `<TU_USUARIO>/catalog-service:1.0.0`
+1. **Build local:** Compilaste con Maven y Docker, generando `<tu-usuario-dockerhub>/catalog-service:1.0.0`
 2. **Push a Docker Hub:** Subiste la imagen a tu repositorio público, haciéndola descargable desde cualquier computadora
 3. **Declaración en Kubernetes:** El archivo `k8s/01-deployment.yaml` declara:
    - Qué imagen usar (desde Docker Hub)

@@ -128,7 +128,7 @@ spec:
     spec:
       containers:
         - name: quarkus-app
-          image: quay.io/quarkus/quarkus-microprofile-quickstart:1.0
+          image: <tu-usuario-dockerhub>/catalog-service:1.0.0
           ports:
             - containerPort: 8080
               name: http
@@ -166,25 +166,36 @@ kubectl get events --sort-by='.metadata.creationTimestamp' -n default
 ### Qué sucede internamente (secuencia esperada)
 
 ```bash
-REASON              MESSAGE
-Created             Created new replicaset "core-demo-quarkus-xxx"
-ScaledUp            Scaled up replicaset "core-demo-quarkus-xxx" to 2
-Scheduled           Successfully assigned core-demo-quarkus-xxx to minikube
-Pulling             Pulling image "quay.io/quarkus..."
-Pulled              Successfully pulled image
-Created             Created container quarkus-app
-Started             Started container quarkus-app
+REASON                MESSAGE
+SuccessfulCreate      Created pod: core-demo-quarkus-xxx-rdxwk
+ScalingReplicaSet     Scaled up replica set core-demo-quarkus-xxx to 2
+SuccessfulCreate      Created pod: core-demo-quarkus-xxx-kj5hk
+Scheduled             Successfully assigned default/core-demo-quarkus-xxx-kj5hk to minikube
+Scheduled             Successfully assigned default/core-demo-quarkus-xxx-rdxwk to minikube
+Pulling               Pulling image "tu-usuario/catalog-service:1.0.0"
+Pulling               Pulling image "tu-usuario/catalog-service:1.0.0"
+Pulled                Successfully pulled image "tu-usuario/catalog-service:1.0.0"
+Created               Created container quarkus-app
+Started               Started container quarkus-app
+Pulled                Successfully pulled image "tu-usuario/catalog-service:1.0.0"
+Created               Created container quarkus-app
+Started               Started container quarkus-app
 ```
 
-**Análisis:**
+**Nota:** Los eventos se generan de forma intercalada para ambos Pods. El Kubelet descarga la imagen para el primer Pod (~9s), luego para el segundo Pod (~0.8s, más rápido porque está en caché).
 
-1. **API Server:** Recibe YAML, valida, lo almacena en etcd
-2. **Deployment Controller:** Detecta falta de 2 Pods, crea ReplicaSet
-3. **Replica Set Controller:** Detecta falta de réplicas, crea 2 especificaciones de Pod
-4. **Scheduler:** Ve Pods sin nodo, asigna cada uno al nodo más saludable
-5. **Kubelet:** Ve Pods asignados a su nodo, descarga imagen, inicia contenedores
+**Análisis paso a paso:**
 
-Este flujo demuestra el **modelo declarativo** en acción.
+1. **API Server** recibe `kubectl apply` con el YAML, valida la sintaxis y lo almacena en etcd
+2. **Deployment Controller** observa el Deployment, detecta que faltan 2 Pods, crea un ReplicaSet
+3. **ReplicaSet Controller** observa que el ReplicaSet necesita 2 réplicas, crea 2 especificaciones de Pod (evento: `SuccessfulCreate` × 2)
+4. **ReplicaSet Controller** escala el ReplicaSet a 2 (evento: `ScalingReplicaSet`)
+5. **Scheduler** observa los 2 Pods sin nodo asignado, los asigna al nodo más saludable (evento: `Scheduled` × 2)
+6. **Kubelet** (en el nodo) observa los Pods asignados a su nodo, descarga la imagen (evento: `Pulling` × 2)
+7. **Kubelet** descomprime y crea el contenedor (evento: `Created`)
+8. **Kubelet** inicia el contenedor (evento: `Started`)
+
+**Resultado:** El flujo completo demuestra el **modelo declarativo en acción**: declaras el *estado deseado* (2 Pods), y Kubernetes automáticamente reconcilia hasta alcanzarlo.
 
 ---
 
@@ -198,13 +209,14 @@ Kubernetes asigna una IP única a cada Pod. Todos los Pods pueden comunicarse en
 # Ver las IPs asignadas a cada Pod y su nodo
 kubectl get pods -l app=core-demo -o custom-columns=NAME:.metadata.name,IP:.status.podIP,NODE:.spec.nodeName,STATUS:.status.phase
 
-# Captura el nombre del primer Pod
+# Captura el nombre e IP de ambos Pods
 POD_1_NAME=$(kubectl get pods -l app=core-demo -o jsonpath='{.items[0].metadata.name}')
 POD_1_IP=$(kubectl get pods -l app=core-demo -o jsonpath='{.items[0].status.podIP}')
 POD_2_NAME=$(kubectl get pods -l app=core-demo -o jsonpath='{.items[1].metadata.name}')
+POD_2_IP=$(kubectl get pods -l app=core-demo -o jsonpath='{.items[1].status.podIP}')
 
 echo "Pod 1: $POD_1_NAME con IP $POD_1_IP"
-echo "Pod 2: $POD_2_NAME"
+echo "Pod 2: $POD_2_NAME con IP $POD_2_IP"
 ```
 
 ### ![win](images/windows.png) Instrucciones para Windows
@@ -213,13 +225,14 @@ echo "Pod 2: $POD_2_NAME"
 # Ver IPs
 kubectl get pods -l app=core-demo -o custom-columns=NAME:.metadata.name,IP:.status.podIP,NODE:.spec.nodeName
 
-# Captura valores
+# Captura valores de ambos Pods
 $POD_1_NAME = kubectl get pods -l app=core-demo -o jsonpath='{.items[0].metadata.name}'
 $POD_1_IP = kubectl get pods -l app=core-demo -o jsonpath='{.items[0].status.podIP}'
 $POD_2_NAME = kubectl get pods -l app=core-demo -o jsonpath='{.items[1].metadata.name}'
+$POD_2_IP = kubectl get pods -l app=core-demo -o jsonpath='{.items[1].status.podIP}'
 
 Write-Host "Pod 1: $POD_1_NAME con IP $POD_1_IP"
-Write-Host "Pod 2: $POD_2_NAME"
+Write-Host "Pod 2: $POD_2_NAME con IP $POD_2_IP"
 ```
 
 ### Qué observar
@@ -246,7 +259,7 @@ POD_1_IP=$(kubectl get pods -l app=core-demo -o jsonpath='{.items[0].status.podI
 POD_2_NAME=$(kubectl get pods -l app=core-demo -o jsonpath='{.items[1].metadata.name}')
 
 # Ejecutar curl desde Pod 2 hacia Pod 1
-kubectl exec -it $POD_2_NAME -- curl -s http://$POD_1_IP:8080/q/health
+kubectl exec -it $POD_2_NAME -- curl -s http://$POD_1_IP:8080/health
 
 # Resultado esperado: JSON de salud (HTTP 200)
 ```
@@ -257,7 +270,7 @@ kubectl exec -it $POD_2_NAME -- curl -s http://$POD_1_IP:8080/q/health
 $POD_1_IP = kubectl get pods -l app=core-demo -o jsonpath='{.items[0].status.podIP}'
 $POD_2_NAME = kubectl get pods -l app=core-demo -o jsonpath='{.items[1].metadata.name}'
 
-kubectl exec -it $POD_2_NAME -- curl -s http://$POD_1_IP:8080/q/health
+kubectl exec -it $POD_2_NAME -- curl -s http://$POD_1_IP:8080/health
 ```
 
 ### Qué observar
@@ -305,13 +318,14 @@ kubectl get deployment,replicaset,pods -l app=core-demo -o wide
 
 ### Qué observar
 
-```
+```bash
 NAME                       DESIRED   CURRENT   READY
 core-demo-quarkus-xxx      2         2         2
 ```
 
 **Jerarquía:**
-```
+
+```text
 Deployment (core-demo-quarkus)
   └─ ReplicaSet (core-demo-quarkus-xxx)
      ├─ Pod (core-demo-quarkus-xxx-abc1)
@@ -336,10 +350,13 @@ El Deployment administra el ReplicaSet, que a su vez garantiza las réplicas de 
 # Ver qué evento ocurrió
 kubectl describe pod <nombre-del-pod>
 
-# Verificar recursos del nodo
-kubectl top nodes
+# Verificar capacidad de recursos del nodo (sin necesidad de Metrics Server)
+kubectl describe node minikube
 
-# Aumentar tamaño de Minikube
+# O ver el resumen de capacidad allocatable:
+kubectl get nodes -o custom-columns=NAME:.metadata.name,CPU:.status.allocatable.cpu,MEMORY:.status.allocatable.memory
+
+# Aumentar tamaño de Minikube si no tiene recursos suficientes
 minikube stop
 minikube start --cpus=4 --memory=4096
 ```
