@@ -2,11 +2,11 @@
 
 En la sesión anterior analizamos cómo interactúan el _Control Plane_ y los _Worker Nodes_ en Kubernetes, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar los objetos de despliegue como _Deployments_, _ReplicaSets_ y _StatefulSets_ para garantizar alta disponibilidad.
 
-### 1. Explicación conceptual
+## 1. Explicación conceptual
 
 Garantizar alta disponibilidad (_High Availability_) en producción no consiste únicamente en crear contenedores, sino en gestionar de forma inteligente su ciclo de vida, su estrategia de actualización y la forma en que el orquestador detecta cuando un proceso entra en un estado no saludable.
 
-#### Objetos de workload para alta disponibilidad
+### Objetos de workload para alta disponibilidad
 
 Kubernetes proporciona distintas abstracciones de nivel superior según la naturaleza de la carga de trabajo:
 
@@ -24,7 +24,7 @@ Kubernetes proporciona distintas abstracciones de nivel superior según la natur
 
 - **StatefulSet:** Diseñado para cargas de trabajo _stateful_ (con estado), como bases de datos (PostgreSQL, MySQL) o brokers de mensajería. Asigna una identidad de red única y persistente a cada _Pod_ (`pod-0`, `pod-1`), realiza despliegues e incrementos ordenados y vincula almacenamiento de forma persistente a cada réplica específica.
 
-#### Estrategias de actualización: Zero-downtime
+### Estrategias de actualización: Zero-downtime
 
 Para actualizar la versión de nuestra aplicación en un `Deployment`, contamos con dos estrategias principales:
 
@@ -36,7 +36,7 @@ Para actualizar la versión de nuestra aplicación en un `Deployment`, contamos 
 
     - `maxUnavailable`: Número o porcentaje máximo de _Pods_ que pueden no estar disponibles durante el proceso.
 
-#### Probes de salud (Health Probes)
+### Probes de salud (Health Probes)
 
 Para que la autocuración (_self-healing_) funcione, Kubernetes necesita verificar periódicamente el estado interno de nuestros contenedores:
 
@@ -46,7 +46,7 @@ Para que la autocuración (_self-healing_) funcione, Kubernetes necesita verific
 
 - **LivenessProbe:** Determina si la aplicación está viva. Si falla repetidamente (según el `failureThreshold`), el `kubelet` reinicia inmediatamente el contenedor para recuperarlo de bloqueos (_deadlocks_) o estados irrecuperables.
 
-### 2. Analogía del mundo real
+## 2. Analogía del mundo real
 
 Imagina la gestión de un equipo de corredores de relevos en un maratón de alto rendimiento:
 
@@ -66,7 +66,7 @@ Imagina la gestión de un equipo de corredores de relevos en un maratón de alto
 
     - **LivenessProbe (Chequeo de pulso en carrera):** Si el médico detecta que el atleta sufrió un desmayo en plena carrera, ordena sacarlo en camilla y reiniciar la posición con un corredor fresco.
 
-### Visualización: Ciclo de Vida de Deployment → ReplicaSet → Pods
+## Visualización: Ciclo de Vida de Deployment → ReplicaSet → Pods
 
 ![deployment](images/image-02.jpg)
 
@@ -88,11 +88,11 @@ Imagina la gestión de un equipo de corredores de relevos en un maratón de alto
 | **ReadinessProbe** | ¿Listo para tráfico? | Si falla: remueve del Service load balancer |
 | **LivenessProbe** | ¿Proceso vivo? | Si falla: reinicia el contenedor |
 
-### 3. Laboratorio
+## 3. Laboratorio
 
 Para completar esta parte, sigue el [Laboratorio de la clase 2.2](../02-laboratorio/laboratorio-clase-2-2.md). Allí encontrarás todos los pasos, código y procedimientos necesarios para crear Deployments con RollingUpdate, configurar los tres tipos de health probes, desplegar manifiestos YAML y ejecutar actualizaciones sin downtime.
 
-### 4. Reto de ingeniería o pregunta de reflexión
+## 4. Reto de ingeniería o pregunta de reflexión
 
 **El escenario:** Un equipo de desarrollo desplegó un microservicio crítico en Quarkus con `maxUnavailable: 50%` y sin configurar ningún `readinessProbe` en el manifiesto YAML del `Deployment`.
 
@@ -103,4 +103,3 @@ Durante un despliegue en hora pico, la nueva imagen del microservicio contenía 
 1. Dado que no hay `readinessProbe` configurado, ¿en qué momento exacto considera Kubernetes que los nuevos _Pods_ están listos para recibir tráfico y qué porcentaje de peticiones de los usuarios reales fallará con error de conexión durante esos 45 segundos?
 
 2. Si además configuramos un `livenessProbe` agresivo con `initialDelaySeconds: 5` y `periodSeconds: 2` sin incluir un `startupProbe`, ¿por qué la aplicación entrará en un bucle infinito de reinicios (_CrashLoopBackOff_) aunque el código no tenga ningún _bug_ sintáctico?
-

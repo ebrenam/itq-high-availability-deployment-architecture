@@ -2,13 +2,13 @@
 
 En la sesión anterior analizamos cómo estructurar la infraestructura _multi-AZ_ y tolerante a fallos en la nube, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar la arquitectura interna y componentes clave de Kubernetes.
 
-### 1. Explicación conceptual
+## 1. Explicación conceptual
 
 Kubernetes funciona mediante una arquitectura distribuida basada en un modelo de **estado deseado** (_declarative state management_). En lugar de indicarle al sistema cada comando paso a paso, declaramos cómo queremos que se vea el clúster (por ejemplo, "mantén 3 réplicas del microservicio en Quarkus") y el orquestador se encarga continuamente de reconciliar el estado actual con el estado deseado.
 
 Para lograr esto, la arquitectura se divide limpiamente en dos planos de responsabilidad:
 
-#### Plano de Control (_Control Plane_)
+### Plano de Control (_Control Plane_)
 
 Es el cerebro del clúster. Toma las decisiones de orquestación, detecta eventos y reacciona ante fallos de infraestructura:
 
@@ -20,7 +20,7 @@ Es el cerebro del clúster. Toma las decisiones de orquestación, detecta evento
 
 - **kube-controller-manager:** El motor de la reconciliación. Ejecuta múltiples procesos controladores en segundo plano (como `DeploymentController`, `NodeController` o `ReplicaSetController`). Compara constantemente el estado real del clúster contra el estado deseado almacenado en `etcd`.
 
-#### Plano de Trabajo (_Worker Nodes_)
+### Plano de Trabajo (_Worker Nodes_)
 
 Son las máquinas (físicas o virtuales) donde se ejecutan realmente nuestras aplicaciones dentro de contenedores:
 
@@ -30,7 +30,7 @@ Son las máquinas (físicas o virtuales) donde se ejecutan realmente nuestras ap
 
 - **Container Runtime:** El motor subyacente que ejecuta los contenedores (como `containerd` o `CRI-O`). Recibe las órdenes del `kubelet` a través de la interfaz estándar `CRI` (_Container Runtime Interface_).
 
-#### Tabla comparativa: Componentes del Control Plane vs. Worker Nodes
+### Tabla comparativa: Componentes del Control Plane vs. Worker Nodes
 
 | Componente | Ubicación | Responsabilidad | Rol Análogo |
 |---|---|---|---|
@@ -42,7 +42,7 @@ Son las máquinas (físicas o virtuales) donde se ejecutan realmente nuestras ap
 | **kube-proxy** | Worker Node | Gestiona reglas de red y tráfico | Sistema de pasillos/elevadores |
 | **Container Runtime** | Worker Node | Descarga y ejecuta contenedores | Personal de limpieza |
 
-#### Modelo de Red Plana (_Flat Network Model_)
+### Modelo de Red Plana (_Flat Network Model_)
 
 Kubernetes impone un modelo de red fundamental conocido como "IP por Pod" (_IP-per-Pod model_):
 
@@ -52,7 +52,7 @@ Kubernetes impone un modelo de red fundamental conocido como "IP por Pod" (_IP-p
 
 3. Se requiere un complemento CNI (_Container Network Interface_ como Calico, Cilium o Flannel) para implementar este modelo y aplicar políticas de red (_NetworkPolicies_) que aíslen el tráfico entre espacios de nombres (_namespaces_).
 
-### 2. Analogía del mundo real
+## 2. Analogía del mundo real
 
 Imagina la operación diaria de un crucero internacional de lujo:
 
@@ -74,7 +74,7 @@ Imagina la operación diaria de un crucero internacional de lujo:
 
     - **kube-proxy (El sistema de pasillos y elevadores con señalética):** Garantiza que si un pasajero pide servicio al cuarto desde la cocina, los platillos lleguen al camarote correcto sin importar en qué nivel esté la cocina o el cuarto.
 
-### Visualización: Arquitectura Control Plane vs. Worker Nodes
+## Visualización: Arquitectura Control Plane vs. Worker Nodes
 
 ![k8s](images/image-01.jpg)
 
@@ -100,4 +100,3 @@ Para completar esta parte, sigue el [Laboratorio de la clase 2.1](../02-laborato
 1. Durante los 15 minutos que `etcd` estuvo caído, ¿qué ocurre con las aplicaciones y microservicios en Quarkus que ya estaban corriendo en los _Worker Nodes_? ¿Siguen recibiendo y respondiendo peticiones de los usuarios finales a través de `kube-proxy`?
 
 2. Si durante esa misma ventana de falla un _Pod_ en un _Worker Node_ colapsa por un error de memoria (`OOMKilled`), ¿qué capacidad tiene el clúster de autorecuperarse y crear un reemplazo? Explica qué componente se ve imposibilitado de actuar y por qué.
-
