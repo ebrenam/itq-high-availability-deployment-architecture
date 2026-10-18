@@ -24,9 +24,7 @@ Crearás un **nuevo microservicio** (`inventory-service`) en Quarkus, lo despleg
 
 **Conexión con Clase 2.2:** Esta clase enseña Deployments, ReplicaSets, Health Checks (StartupProbe, ReadinessProbe, LivenessProbe) y RollingUpdate. Este lab **implementa cada concepto**.
 
-**Dependencia Anterior:** [Laboratorio 1.3](../../unidad-1-ha-architecture/02-laboratorio/laboratorio-clase-1-3.md) generó `catalog-service:1.0.0` + manifiestos YAML. **Este lab HEREDA ese código.**
-
-**Antes de Continuar:** Completa Laboratorio 2.2 antes de [Laboratorio 2.3](./laboratorio-clase-2-3.md). En Lab 2.3, trabajarás con estos mismos dos servicios (catalog-service e inventory-service) para implementar escalamiento automático (HPA - Horizontal Pod Autoscaler) basado en métricas de CPU y memoria.
+**Dependencia anterior:** [Laboratorio 1.3](../../unidad-1-ha-architecture/02-laboratorio/laboratorio-clase-1-3.md) generó `catalog-service:1.0.0` + manifiestos YAML. **Este laboratorio hereda ese código.**
 
 ---
 
