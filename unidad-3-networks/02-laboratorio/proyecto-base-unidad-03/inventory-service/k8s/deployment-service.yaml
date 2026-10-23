@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  labels:
+    app: inventory-service
+    version: v1.0.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1           # Permite 1 Pod extra durante actualización
+      maxUnavailable: 0     # NUNCA permite 0 Pods: zero-downtime
+  selector:
+    matchLabels:
+      app: inventory-service
+  template:
+    metadata:
+      labels:
+        app: inventory-service
+        version: v1.0.0
+    spec:
+      containers:
+      - name: inventory-service
+        image: ebrena/inventory-service:1.0.0
+        imagePullPolicy: Always            # Siempre tira imagen fresca de Docker Hub
+        ports:
+        - containerPort: 8080
+          name: http
+        
+        # INYECCIÓN DE VARIABLES desde ConfigMap y Secret
+        env:
+        - name: APP_ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: inventory-config
+              key: APP_ENVIRONMENT
+        - name: INVENTORY_DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: inventory-config
+              key: INVENTORY_DB_HOST
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: inventory-config
+              key: LOG_LEVEL
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: inventory-secrets
+              key: DB_PASSWORD
+        
+        resources:
+          requests:
+            cpu: "100m"        # Crítico: HPA calcula porcentajes basado en esta solicitud
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        
+        # 1. StartupProbe: ¿Arrancó la JVM correctamente?
+        # Endpoint: curl http://localhost:8080/health/started
+        startupProbe:
+          httpGet:
+            path: /health/started
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 3
+          timeoutSeconds: 2
+          failureThreshold: 20          # Máx 20 reintentos (60 segundos)
+        
+        # 2. ReadinessProbe: ¿Listo para recibir tráfico?
+        # Endpoint: curl http://localhost:8080/health/ready
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 2
+        
+        # 3. LivenessProbe: ¿Sigue vivo o se quedó colgado?
+        # Endpoint: curl http://localhost:8080/health/live
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 3
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service
+  labels:
+    app: inventory-service
+spec:
+  type: ClusterIP
+  selector:
+    app: inventory-service
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http

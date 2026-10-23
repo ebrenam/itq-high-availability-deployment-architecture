@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: inventory-load-gen
+  labels:
+    app: inventory-load-gen
+spec:
+  restartPolicy: Never
+  activeDeadlineSeconds: 240
+  containers:
+  - name: load-generator
+    image: busybox:1.37
+    env:
+    - name: CONCURRENCY
+      value: "20"
+    - name: DURATION_SECONDS
+      value: "180"
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "32Mi"
+      limits:
+        cpu: "1000m"
+        memory: "64Mi"
+    command: ["sh", "-c"]
+    args:
+    - |
+      URL=http://inventory-service/v1/inventory
+      echo "Verificando el endpoint antes de generar carga..."
+      wget -S -T 5 -O - "$URL" || {
+        echo "ERROR: no se pudo consultar el endpoint; no se inicia la carga." >&2
+        exit 1
+      }
+      echo
+      echo "Iniciando $CONCURRENCY procesos durante $DURATION_SECONDS segundos."
+      END=$(($(date +%s) + DURATION_SECONDS))
+      PIDS=""
+      for i in $(seq 1 "$CONCURRENCY"); do
+        (
+          COUNT=0
+          while [ "$(date +%s)" -lt "$END" ]; do
+            wget -q -T 5 -O /dev/null "$URL" || {
+              echo "ERROR: fallo HTTP o de conexion en proceso $i." >&2
+              exit 1
+            }
+            COUNT=$((COUNT + 1))
+          done
+          echo "Proceso $i: $COUNT peticiones completadas."
+        ) &
+        PIDS="$PIDS $!"
+      done
+      STATUS=0
+      for PID in $PIDS; do
+        wait "$PID" || STATUS=1
+      done
+      if [ "$STATUS" -ne 0 ]; then
+        echo "ERROR: la prueba termino con peticiones fallidas." >&2
+        exit 1
+      fi
+      echo "Carga finalizada sin errores detectados."
