@@ -2,7 +2,7 @@
 
 En la sesión anterior analizamos cómo externalizar configuraciones y escalar réplicas dinámicamente con _ConfigMaps_, _Secrets_ y _HPA_, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar _Services_, _Ingress_ y _Load Balancers_ para exponer nuestro clúster.
 
-## Explicación conceptual
+## 1. Explicación conceptual
 
 En Kubernetes, los _pods_ son efímeros. Tienen direcciones IP dinámicas que cambian cada vez que un _pod_ se destruye, escala o se reprograma en otro nodo. Si intentaras conectar un cliente externo directamente a la IP de un _pod_, el enlace se rompería en cuestión de minutos.
 
@@ -22,7 +22,7 @@ Para resolver este problema de direccionamiento inestable, Kubernetes abstrae la
 [ Pod 1 ] [ Pod 2 ]  (L3: IPs dinámicas en la red overlay)
 ```
 
-### 1. La capa de red de capa 4: Kubernetes Services
+### 1.1 La capa de red de capa 4: Kubernetes services
 
 Un _Service_ es una abstracción que define un conjunto lógico de _pods_ y una política para acceder a ellos mediante etiquetas (_labels_). Funciona como un balanceador de carga interno de capa 4 (TCP/UDP) con una IP virtual fija (_ClusterIP_).
 
@@ -36,7 +36,7 @@ Existen cuatro tipos de objetos _Service_:
 
 - **`ExternalName`:** Mapea el servicio a un nombre DNS externo (mediante un registro `CNAME`), sin usar _selectors_ ni _pods_ locales.
 
-### 2. La capa de enrutamiento de capa 7: Ingress y API Gateways
+### 1.2 La capa de enrutamiento de capa 7: Ingress y API gateways
 
 Aprovisionar un objeto `LoadBalancer` por cada microservicio en producción resulta costoso e ineficiente. Aquí entra el recurso **`Ingress`**.
 
@@ -52,7 +52,9 @@ Un _Ingress_ opera en la capa 7 del modelo OSI (HTTP/HTTPS) y actúa como un pun
 
 > **Nota arquitectónica:** El recurso `Ingress` por sí solo es únicamente una especificación de reglas. Requiere un **Ingress Controller** (como NGINX Ingress Controller, Traefik o HAProxy) ejecutándose en el clúster para procesar esas reglas y dirigir el tráfico. Para escenarios más complejos que requieren gestión de cuotas (_rate limiting_), autenticación OAuth2 o métricas detalladas, se integran **API Gateways** (como Kong o Envoy).
 
-## Analogía del mundo real
+---
+
+## 2. Analogía del mundo real
 
 Imagina un gran edificio corporativo de oficinas:
 
@@ -66,194 +68,129 @@ Imagina un gran edificio corporativo de oficinas:
 
 - **Ingress Controller:** Es la recepción principal del edificio en la planta baja. Una sola puerta de entrada con un recepcionista que lee tu solicitud: si pides hablar con "Ventas", te dirige al ascensor B (_path-based_); si muestras una identificación VIP con acceso especial, te envía al piso ejecutivo con cifrado de seguridad (_TLS/SSL termination_).
 
-## Desglose técnico paso a paso
-
-A continuación, desplegaremos un microservicio de demostración en Quarkus y lo expondremos de forma segura con reglas de dominio, rutas y cifrado SSL/TLS simulado.
-
-### Paso 1: Crear el certificado TLS sintético para el dominio
-
-Para habilitar HTTPS en el _Ingress Controller_, generaremos un par de llaves (certificado y clave privada) y las guardaremos en un objeto `Secret` de tipo `kubernetes.io/tls`.
-
-```bash
-# Generar certificado autofirmado para el dominio ficticio
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout app-tls.key -out app-tls.crt \
-  -subj "/CN=tienda.local/O=DevOps"
-
-# Crear el Secret en Kubernetes
-kubectl create secret tls tienda-tls-secret \
-  --key=app-tls.key \
-  --cert=app-tls.crt
-```
-
-### Paso 2: Configurar los Deployments y Services internos
-
-Crearemos dos microservicios simulados (`frontend` y `catalog`). Ambos usarán la clase `ClusterIP` para permanecer privados dentro del clúster.
-
-Guarda el siguiente manifiesto como `01-apps-and-services.yaml`:
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: frontend-deployment
-  labels:
-    app: frontend
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: frontend
-  template:
-    metadata:
-      labels:
-        app: frontend
-    spec:
-      containers:
-      - name: web
-        image: nginxdemos/hello:plain-text
-        ports:
-        - containerPort: 80
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: frontend-service
-spec:
-  type: ClusterIP
-  selector:
-    app: frontend
-  ports:
-  - port: 80
-    targetPort: 80
+
+## 3. Arquitectura Completa: Flujo de Tráfico
+
+```text
+                    INTERNET (HTTPS:443)
+                            │
+                            │ checkout.local
+                            ▼
+              ┌──────────────────────────────┐
+              │ NGINX Ingress Controller      │
+              │ - TLS Termination             │
+              │ - Host-based routing          │
+              │ - Path-based routing          │
+              └───────────┬────────────────────┘
+                          │
+               ┌──────────┼──────────┐
+               │                     │
+               ▼ HTTP:8080           ▼ HTTP:8080
+          ┌─────────────┐       ┌──────────────┐
+          │   Service   │       │   Service    │
+          │  payment    │       │  catalog     │
+          │(ClusterIP)  │       │ (ClusterIP)  │
+          └──────┬──────┘       └──────┬───────┘
+                 │                     │
+             ┌───┴───┐            ┌───┴────┐
+             ▼       ▼            ▼        ▼
+           ┌───┐  ┌───┐       ┌────┐   ┌────┐
+           │ P1│  │ P2│       │ P3 │   │ P4 │
+           └───┘  └───┘       └────┘   └────┘
+        (IPs dinámicas cambian constantemente)
+```
+
 ---
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: catalog-deployment
-  labels:
-    app: catalog
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: catalog
-  template:
-    metadata:
-      labels:
-        app: catalog
-    spec:
-      containers:
-      - name: api
-        image: hashicorp/http-echo:latest
-        args:
-        - "-text=Respuestas desde el Microservicio de Catalogo"
-        ports:
-        - containerPort: 5678
+
+## 4. Caso de Uso Real: Plataforma E-commerce
+
+Imagina una plataforma de e-commerce con 3 microservicios:
+
+| Servicio | Tipo | Acceso | Propósito |
+|----------|------|--------|-----------|
+| **payment-service** | ClusterIP | Ingress → HTTPS | Procesar pagos (acceso externo) |
+| **catalog-service** | ClusterIP | payment-service → HTTP | Datos de productos (privado) |
+| **inventory-service** | ClusterIP | payment-service → HTTP | Stock de productos (privado) |
+
+Con **un solo Ingress Controller**, exponemos payment-service con TLS, mientras catalog e inventory permanecen privadas (solo accesibles internamente).
+
+```
+Cliente navegando checkout.local (HTTPS):
+    │
+    └──→ Ingress Controller (NGINX)
+            │
+            └──→ payment-service (Pod 1/2)
+                    │
+                    ├──→ catalog-service (privado)
+                    └──→ inventory-service (privado)
+```
+
+Sin Ingress, necesitaríamos:
+- ❌ 3 LoadBalancers externos (costoso)
+- ❌ Gestionar 3 IPs públicas diferentes
+- ❌ 3 certificados TLS separados
+- ❌ Los clientes necesitarían saber 3 direcciones diferentes
+
+Con Ingress:
+- ✅ 1 Ingress Controller
+- ✅ 1 dominio (checkout.local)
+- ✅ 1 certificado TLS centralizado
+- ✅ Los clientes ven solo el dominio público
+
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: catalog-service
-spec:
-  type: ClusterIP
-  selector:
-    app: catalog
-  ports:
-  - port: 80
-    targetPort: 5678
+
+## 5. Comparación: Alternativas Históricas
+
+### Infraestructura Tradicional (Pre-Kubernetes)
+```
+Monolítico
+└─ 1 aplicación = 1 servidor = 1 IP pública = 1 DNS
+   Escalado manual, sin service discovery
 ```
 
-Aplica la configuración:
-
-```bash
-kubectl apply -f 01-apps-and-services.yaml
+### Kubernetes Sin Ingress (Solo ClusterIP + NodePort)
+```
+Múltiples servicios, pero sin unificación:
+└─ Cada NodePort = puerto diferente (30000, 30001, 30002...)
+└─ Cliente debe saber puertos específicos
+└─ Sin gestión centralizada de TLS
+└─ Sin enrutamiento sofisticado
 ```
 
-### Paso 3: Definir el objeto Ingress con enrutamiento L7 y TLS
-
-Crea el archivo `02-ingress-rules.yaml` definiendo el enrutamiento por rutas (_path-based_) y la terminación de certificados HTTPS.
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: tienda-ingress
-  annotations:
-    # Anotación específica para NGINX Ingress Controller
-    nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-  ingressClassName: nginx
-  tls:
-  - hosts:
-    - tienda.local
-    secretName: tienda-tls-secret
-  rules:
-  - host: tienda.local
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: frontend-service
-            port:
-              number: 80
-      - path: /catalog
-        pathType: Prefix
-        backend:
-          service:
-            name: catalog-service
-            port:
-              number: 80
+### Kubernetes + Ingress (Mejor Práctica Moderna)
+```
+Múltiples servicios, acceso unificado:
+└─ UN Ingress Controller = múltiples dominios/rutas
+└─ Gestión centralizada de TLS
+└─ Cliente ve nombres amigables (checkout.local)
+└─ Escala transparentemente sin cambiar cliente
 ```
 
-Aplica el objeto `Ingress`:
+---
 
-```bash
-kubectl apply -f 02-ingress-rules.yaml
-```
+## 6. Laboratorio
 
-### Paso 4: Pruebas de verificación y consumo del tráfico
+Para completar esta parte, sigue el [Laboratorio de la clase 3.1](../02-laboratorio/laboratorio-clase-3-1.md). Allí encontrarás todos los pasos, código y procedimientos necesarios para instalar NGINX Ingress Controller, crear certificados TLS, desplegar manifests y validar acceso seguro desde clientes externos.
 
-1. Obten la IP asignada a tu _Ingress Controller_ (en entornos locales como Minikube, usa `minikube ip`):
+---
 
-    ```bash
-    kubectl get ingress tienda-ingress
-    ```
-
-2. Mapea la IP a tu archivo de hosts local (`/etc/hosts` en Linux/Mac o `drivers/etc/hosts` en Windows):
-
-    ```text
-    192.168.49.2  tienda.local
-    ```
-
-3. Realiza las peticiones de prueba verificando el enrutamiento y la terminación de TLS:
-
-    ```bash
-    # Probar la ruta raíz (Servicio Frontend)
-    curl -k https://tienda.local/
-    
-    # Probar la ruta del catálogo (Servicio Catalog)
-    curl -k https://tienda.local/catalog
-    ```
-
-## Reto de ingeniería o pregunta de reflexión
+## 7. Reto de ingeniería o pregunta de reflexión
 
 **El escenario:**
 
-Tu empresa tiene una aplicación bancaria crítica desplegada en Kubernetes. Un ingeniero junior configuró el controlador de _Ingress_ para realizar la terminación TLS/SSL en el borde del clúster (el tráfico que llega de los clientes HTTPS se descifra al entrar a la red).
+Tu empresa tiene una arquitectura con 5 microservicios desplegados en Kubernetes. Actualmente todos están expuestos a través de un único Ingress Controller NGINX usando terminación TLS en el borde:
 
-A partir de ese punto, el _Ingress_ reenvía el tráfico internamente a los _pods_ usando HTTP plano sobre el tipo de servicio `ClusterIP`.
+```
+Cliente → HTTPS:443 → Ingress Controller → HTTP:8080 → Pods (sin cifrado interno)
+```
 
-El equipo de auditoría e infraestructura emite una alerta roja alegando que el entorno **incumple las normativas de seguridad PCI-DSS**, ya que el tráfico interno dentro de la red del clúster viaja no cifrado (_in-cleartext_).
+El equipo de auditoría identifica que el tráfico interno entre el Ingress Controller y los Pods viaja en HTTP plano, lo cual viola la normativa de seguridad PCI-DSS que requiere **cifrado de extremo a extremo**.
 
-**Preguntas para debate:**
+**Para debatir en clase:**
 
-1. ¿Qué patrón o estrategia de red aplicarías para garantizar cifrado de extremo a extremo (_End-to-End TLS / TLS Passthrough_) desde el cliente externo hasta el _pod_ de Quarkus?
+1. ¿Qué patrón de seguridad de red (TLS Passthrough vs. mTLS) implementarías para garantizar que cada Pod tenga su propio certificado TLS y el tráfico entre Ingress y Pods también sea cifrado? ¿Cuáles serían los trade-offs en complejidad y rendimiento?
 
-2. ¿Qué impacto en el rendimiento de la CPU del clúster tiene trasladar la carga del descifrado criptográfico desde un solo _Ingress Controller_ hacia cada uno de los _pods_ individuales?
+2. Si implementas mTLS nativa en Kubernetes (Service Mesh como Istio o Linkerd), ¿qué ventaja adicional obtienes comparado con solo usar certificados auto-firmados en cada Pod?
 
-3. En arquitecturas modernas de microservicios, ¿cómo resuelve este problema una Service Mesh (ej. Istio o Linkerd) mediante el concepto de **mTLS** (_mutual TLS_) sin tener que modificar una sola línea de código en la aplicación Java?
-
-> "En la sesión anterior analizamos cómo gestionar el tráfico de entrada mediante _Services_, _Ingress_ y terminación TLS, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar _NetworkPolicies_, el CNI y el aislamiento del tráfico interno."
+3. ¿Cómo balancearías la seguridad (cifrado total) con la observabilidad (poder ver el tráfico en logs del Ingress)?

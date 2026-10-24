@@ -6,7 +6,7 @@ En la sesión anterior analizamos cómo asegurar la conectividad interna mediant
 
 En Kubernetes, la seguridad de acceso y despliegue opera bajo la premisa de que todo punto de acceso —ya sea un ingeniero ejecutando `kubectl` o un microservicio en Java con Quarkus consultando la API— debe ser autenticado y autorizado bajo el principio de mínimo privilegio (_Least Privilege_).
 
-### Control de acceso basado en roles (RBAC)
+### 1.1 Control de acceso basado en roles (RBAC)
 
 La autorización en la API del clúster se gestiona mediante cuatro objetos fundamentales:
 
@@ -18,19 +18,21 @@ La autorización en la API del clúster se gestiona mediante cuatro objetos fund
 
 - **`ClusterRoleBinding`:** Otorga los permisos de un `ClusterRole` a un sujeto en todos los _namespaces_ del clúster.
 
-### Identidad para aplicaciones: ServiceAccounts
+### 1.2 Identidad para aplicaciones: serviceaccounts
 
 Los usuarios humanos suelen autenticarse mediante proveedores OIDC o certificados X.509, pero las cargas de trabajo (_workloads_) utilizan **`ServiceAccounts`**. Cuando un _pod_ se ejecuta con una `ServiceAccount`, Kubernetes inyecta un _JSON Web Token_ (JWT) firmado de corta duración en `/var/run/secrets/kubernetes.io/serviceaccount/token`. Este token le permite a la aplicación realizar peticiones autenticadas contra la API Server de Kubernetes.
 
-### Gestión de datos sensibles e integración con Key Vaults
+### 1.3 Gestión de datos sensibles e integración con Key Vaults
 
 Los objetos **`Secret`** nativos de Kubernetes guardan datos confidenciales (contraseñas, tokens API). Sin embargo, por defecto están codificados únicamente en `Base64` y se almacenan sin encriptar en `etcd` (a menos que se active _encryption-at-rest_). En entornos de producción cloud-native, la mejor práctica consiste en externalizar el ciclo de vida de los secretos hacia un gestor dedicado (Azure Key Vault, HashiCorp Vault, AWS Secrets Manager) e integrarlos al clúster utilizando controladores como **External Secrets Operator (ESO)** o **Secrets Store CSI Driver**.
 
-### Seguridad de la carga de trabajo y cadena de suministro
+### 1.4 Seguridad de la carga de trabajo y cadena de suministro
 
 - **Pod Security Standards (PSS) & Admission Controllers:** Reemplazaron a las antiguas _PodSecurityPolicies_. PSS categoriza el endurecimiento de los contenedores en tres niveles: _Privileged_ (sin restricciones), _Baseline_ (previene escalación de privilegios conocida) y _Restricted_ (exige ejecución como usuario no-root, aislamiento del sistema de archivos de solo lectura y deshabilitación de capacidades del Kernel).
 
 - **Escaneo y firma de imágenes:** La seguridad de la cadena de suministro (_supply chain_) exige que toda imagen en el _registry_ sea escaneada contra vulnerabilidades conocidas (CVEs) antes del despliegue y validada mediante firmas digitales usando herramientas como **Cosign** / **Sigstore** a través de un _validating admission webhook_ (ej. Kyverno u OPA/Gatekeeper).
+
+---
 
 ## 2. Analogía del mundo real
 
@@ -50,180 +52,190 @@ Imagina la seguridad de un hotel de alta gama:
 
 - **Pod Security Standards (Las reglas de protección civil):** Son los inspectores en la puerta del hotel. El nivel _Restricted_ no permite que ningún visitante entre con materiales inflamables, herramientas pesadas o sin identificación verificable, asegurando que nadie pueda tomar el control del inmueble si entra a una habitación.
 
-## 3. Desglose técnico paso a paso
-
-Configuraremos una arquitectura donde un microservicio Quarkus en el _namespace_ `apps` utiliza una **`ServiceAccount`** dedicada para consultar de forma segura únicamente los pods de su propio _namespace_, mientras que el _namespace_ impone el perfil de seguridad **`Restricted`**.
-
-### Paso 1: Configurar el Namespace con Pod Security Standards
-
-Crea el archivo `01-namespace-security.yaml`. Etiquetamos el _namespace_ para obligar a que cualquier _pod_ desplegado cumpla con el estándar _Restricted_.
-
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: apps
-  labels:
-    pod-security.kubernetes.io/enforce: restricted
-    pod-security.kubernetes.io/enforce-version: latest
-    pod-security.kubernetes.io/warn: restricted
-```
-
-Aplica el _namespace_:
-
-```bash
-kubectl apply -f 01-namespace-security.yaml
-```
-
-### Paso 2: Crear el rol RBAC y la ServiceAccount de mínimo privilegio
-
-Crea el archivo `02-rbac-setup.yaml`:
-
-```yaml
-# 1. Identidad para la aplicación
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: quarkus-monitor-sa
-  namespace: apps
 ---
-# 2. Definición del Role (permisos de lectura únicamente sobre Pods)
+
+## 3. Arquitectura de Seguridad Multinivel
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Kubernetes Cluster (kube-apiserver)                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ Namespace: apps                                      │   │
+│  │ PSS Enforce: Restricted (no root, read-only fs)     │   │
+│  ├──────────────────────────────────────────────────────┤   │
+│  │                                                       │   │
+│  │  ┌────────────────────────────────────────────────┐  │   │
+│  │  │ Deployment (payment-service)                   │  │   │
+│  │  │ ├─ ServiceAccount: payment-app                 │  │   │
+│  │  │ ├─ SecurityContext: runAsNonRoot: true         │  │   │
+│  │  │ └─ Container: readOnlyRootFilesystem: true     │  │   │
+│  │  │                                                 │  │   │
+│  │  │ Pod ───→ (injected JWT token)                  │  │   │
+│  │  │           ├─ Path: /var/run/secrets/.../token  │  │   │
+│  │  │           └─ Issuer: kube-apiserver            │  │   │
+│  │  └────────────────────────────────────────────────┘  │   │
+│  │           │ ↓ (authenticated request)                │   │
+│  │           │ kubectl get pods --token=<JWT>         │   │
+│  │           ▼                                         │   │
+│  │  ┌────────────────────────────────────────────────┐  │   │
+│  │  │ RBAC RoleBinding                                │  │   │
+│  │  │ ├─ ServiceAccount: payment-app                 │  │   │
+│  │  │ ├─ Role: payment-app-reader                    │  │   │
+│  │  │ └─ Verbs: get, list (pods only)               │  │   │
+│  │  └────────────────────────────────────────────────┘  │   │
+│  │           │ ↓ (authorization check)                 │   │
+│  │           │ ✅ Permitido: get pods                 │   │
+│  │           │ ❌ Bloqueado: delete pods              │   │
+│  │           ▼                                         │   │
+│  │  ┌────────────────────────────────────────────────┐  │   │
+│  │  │ kube-apiserver Response: 200 OK                │  │   │
+│  │  │ {"items": [...pods en namespace apps...]}      │  │   │
+│  │  └────────────────────────────────────────────────┘  │   │
+│  │                                                       │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Flujo de seguridad por capas:**
+
+1. **Capas de Autenticación (¿Quién eres?):**
+   - Usuario: OIDC / Certificado X.509
+   - Pod: ServiceAccount JWT (inyectado automáticamente)
+
+2. **Capa de Autorización (¿Qué puedes hacer?):**
+   - RBAC evalúa Role + RoleBinding
+   - Respuesta: Permitido / Denegado
+
+3. **Capa de Admisión (¿Puedes entrar con eso?):**
+   - Pod Security Standards valida el manifiesto
+   - Respuesta: Acepta / Rechaza antes de desplegar
+
+4. **Capa de Aislamiento (¿Dónde puedes estar?):**
+   - SecurityContext aísla el contenedor (user, filesystem, capabilities)
+   - NetworkPolicy aísla la comunicación entre pods
+
+---
+
+## 4. RBAC: Verbos Comunes y Ejemplos
+
+| Verbo | Típicamente Se Usa Para |
+|-------|------------------------|
+| `get` | Obtener un recurso específico (`pod`, `service`) |
+| `list` | Listar todos los recursos en un namespace |
+| `watch` | Monitorear cambios en tiempo real |
+| `create` | Crear nuevos recursos |
+| `update` | Modificar recursos existentes |
+| `patch` | Cambios incrementales en recursos |
+| `delete` | Eliminar recursos |
+| `deletecollection` | Eliminar múltiples recursos |
+| `exec` | Ejecutar comandos dentro de un pod |
+| `logs` | Ver logs de un pod |
+| `portforward` | Túnel local a puertos de pods |
+| `port-forward` | Alias de `portforward` |
+
+**Ejemplo de política restrictiva:**
+
+```yaml
+# Role: Solo lectura de pods
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: pod-reader-role
+  name: pod-reader
   namespace: apps
 rules:
 - apiGroups: [""]
   resources: ["pods"]
   verbs: ["get", "list", "watch"]
+```
+
 ---
-# 3. Vinculación de la ServiceAccount con el Role
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: read-pods-binding
-  namespace: apps
-subjects:
-- kind: ServiceAccount
-  name: quarkus-monitor-sa
-  namespace: apps
-roleRef:
-  kind: Role
-  name: pod-reader-role
-  apiGroup: rbac.authorization.k8s.io
-```
 
-Aplica la configuración de seguridad:
+## 5. Pod Security Standards: Tres Niveles
 
-```bash
-kubectl apply -f 02-rbac-setup.yaml
-```
+| Nivel | Restricciones | Caso de Uso |
+|-------|--------------|-----------|
+| **Privileged** | Sin restricciones. Permite todo (root, privilegios, etc.) | Solo para contenedores de infraestructura (kubelet, CNI) |
+| **Baseline** | Previene escalación de privilegios conocida | Desarrollo, aplicaciones heredadas que necesitan permisos básicos |
+| **Restricted** | Máximo endurecimiento (no root, read-only fs, sin capabilities) | Producción, aplicaciones cloud-native modernas |
 
-### Paso 3: Desplegar un pod seguro conforme al estándar Restricted
-
-Crea el archivo `03-secure-deployment.yaml`. La especificación del contenedor incluye un **`securityContext`** estricto para no violar el estándar _Restricted_ impuesto en el _namespace_.
+**Enforcing Restricted en un namespace:**
 
 ```yaml
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Namespace
 metadata:
-  name: quarkus-app
-  namespace: apps
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: quarkus-app
-  template:
-    metadata:
-      labels:
-        app: quarkus-app
-    spec:
-      serviceAccountName: quarkus-monitor-sa
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 10001
-        runAsGroup: 10001
-        fsGroup: 10001
-        seccompProfile:
-          type: RuntimeDefault
-      containers:
-      - name: app
-        image: curlimages/curl:8.5.0
-        command: ["sh", "-c", "sleep 3600"]
-        securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-            - ALL
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
 ```
 
-Aplica el _deployment_:
+Si intentas desplegar un pod que viola estas restricciones, Kubernetes rechaza la solicitud con un error 403.
 
-```bash
-kubectl apply -f 03-secure-deployment.yaml
+---
+
+## 6. Cadena de Suministro: Escaneo e Integridad de Imágenes
+
+En producción, **nunca** uses `latest` o tags sin verificar vulnerabilidades:
+
+```
+1. Desarrollador: Construye imagen y sube a registry
+                         │
+                         ▼
+2. Scanner (Trivy/Grype): Escanea CVEs automáticamente
+                         │
+                         ├─ ✅ Vulnerabilidades menores → Aprobada
+                         └─ 🔴 Vulnerabilidades críticas → Rechazada
+                         │
+                         ▼
+3. Cosign/Sigstore: Firma digitalmente la imagen con clave privada
+                         │
+                         ▼
+4. Validating Webhook (Kyverno/OPA): Antes de desplegar,
+   verifica la firma digital de la imagen
+                         │
+                         ├─ ✅ Firma válida → Aprobada
+                         └─ 🔴 Firma inválida/faltante → Rechazada
+                         │
+                         ▼
+5. Pod se despliega en el cluster
 ```
 
-### Paso 4: Verificación de la autorización y validación del token
+---
 
-1. **Prueba de acceso autorizado en el namespace local:** Conéctate al pod y realiza una consulta usando el token de la `ServiceAccount` inyectado por el clúster.
+## 7. Laboratorio
 
-    ```bash
-    APP_POD=$(kubectl get pod -n apps -l app=quarkus-app -o jsonpath='{.items[0].metadata.name}')
+Para completar esta parte, sigue el [Laboratorio de la clase 3.3](../02-laboratorio/laboratorio-clase-3-3.md). Allí encontrarás todos los pasos, código y procedimientos necesarios para configurar Pod Security Standards, crear ServiceAccounts con permisos mínimos, implementar RBAC, validar SecurityContext y realizar escaneo de imágenes.
 
-    # Consultar el endpoint de Pods en el namespace 'apps' utilizando el token autenticado
-    kubectl exec -it $APP_POD -n apps -- sh -c '
-      TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-      curl -s -k -H "Authorization: Bearer $TOKEN" \
-        https://kubernetes.default.svc/api/v1/namespaces/apps/pods
-    '
-    ```
+---
 
-    _Resultado esperado:_ Respuesta HTTP `200 OK` con el listado JSON de los pods del _namespace_ `apps`.
-
-2. **Prueba de denegación de autorización (Mínimo Privilegio):** Intenta consultar los pods del _namespace_ `kube-system` con ese mismo token.
-
-    ```bash
-    kubectl exec -it $APP_POD -n apps -- sh -c '
-      TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-      curl -s -k -H "Authorization: Bearer $TOKEN" \
-        https://kubernetes.default.svc/api/v1/namespaces/kube-system/pods
-    '
-    ```
-
-    _Resultado esperado:_ Respuesta HTTP `403 Forbidden` (`User "system:serviceaccount:apps:quarkus-monitor-sa" cannot list resource "pods" in API group "" in the namespace "kube-system"`).
-
-### 4. Reto de ingeniería o pregunta de reflexión
+## 8. Reto de ingeniería o pregunta de reflexión
 
 **El escenario:**
 
-El equipo de DevOps desplegó un _cluster-autoscaler_ y un sistema de monitoreo en el clúster. Para acelerar las pruebas, un desarrollador configuró la manifestación adjunta binding a la `ServiceAccount` del microservicio:
+Tu empresa está migrando de un modelo monolítico a microservicios en Kubernetes. El equipo de seguridad exige que:
 
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: global-admin-binding
-subjects:
-- kind: ServiceAccount
-  name: quarkus-monitor-sa
-  namespace: apps
-roleRef:
-  kind: ClusterRole
-  name: cluster-admin
-  apiGroup: rbac.authorization.k8s.io
-```
+1. Ningún pod pueda ejecutarse como root
+2. Ningún pod pueda acceder a más datos que los estrictamente necesarios
+3. Ningún pod pueda comunicarse con ningún otro sin permiso explícito
 
-Días después, se detecta que una vulnerabilidad de tipo _Remote Code Execution_ (RCE) en una librería de terceros expuso la aplicación Quarkus en el _namespace_ `apps`.
+Para cumplir esto, implementaste:
+- Pod Security Standards en nivel `Restricted`
+- RBAC con Roles mínimos por microservicio
+- NetworkPolicy con Default Deny All
 
-**Preguntas para debate:**
+**Sin embargo**, los desarrolladores reportan:
 
-1. ¿Qué alcance y nivel de compromiso de seguridad adquirió el atacante al vulnerar la aplicación Quarkus debido a la existencia del `ClusterRoleBinding` mostrado?
+- *"Mi app Java con Quarkus no inicia porque falla en escribir logs"* (readOnlyRootFilesystem)
+- *"No puedo ver los logs del clúster desde la app"* (RBAC restrictivo)
+- *"La app no puede hablar a la BD"* (NetworkPolicy demasiado restrictiva)
 
-2. Si un atacante compromete el pod y lee el token en `/var/run/secrets/kubernetes.io/serviceaccount/token`, ¿cómo ayuda la característica de _Bound Service Account Tokens_ (tokens con límite de tiempo y audiencia específica) a mitigar este riesgo en comparación con los tokens estáticos de versiones antiguas de Kubernetes?
+**Para debatir en clase:**
 
-3. ¿Qué cambio estructural realizarías en la definición de RBAC para garantizar que la aplicación vuelva a operar estrictamente bajo el principio de mínimo privilegio sin romper sus funciones de monitoreo local?
+1. Propón un modelo de "Progressive Security" donde la seguridad sea restrictiva pero práctica. ¿Cómo balancearías entre máxima seguridad (teórica) vs. aplicaciones que realmente necesitan funcionar?
 
-> "En la sesión anterior analizamos cómo asegurar el acceso al clúster mediante RBAC, _ServiceAccounts_ y _Pod Security Standards_, y ahora en esta sesión cerraremos la plataforma segura que servirá como base para automatizar despliegues, pipelines e infraestructura como código en la siguiente unidad."
+2. Diseña una estrategia de onboarding para desarrolladores nuevos: ¿Cómo les enseñarías que escriban código cloud-native sin que vayan contra el RBAC y NetworkPolicy?
+
+3. Si un desarrollador dice *"En desarrollo todo debe funcionar sin restricciones"* pero luego despliega ese código en producción, ¿qué controles en el pipeline CI/CD implementarías para evitar sorpresas?
