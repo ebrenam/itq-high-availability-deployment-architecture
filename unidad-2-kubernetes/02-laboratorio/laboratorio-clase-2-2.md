@@ -97,8 +97,6 @@ minikube start --cpus=4 --memory=4096
 
 **Por qué:** Laboratorio 2.2 usa Laboratorio 1.3 como referencia. Necesitas el código ya compilado y el Dockerfile funcional de catalog-service para desplegar ambos servicios en el mismo clúster.
 
-### Opción A: Si trabajas en secuencia (recomendado)
-
 Copia el output de Laboratorio 1.3 a tu carpeta de trabajo:
 
 ```bash
@@ -114,23 +112,6 @@ cd unidad-2-kubernetes/02-laboratorio/proyecto-base-unidad-02/catalog-service
 ls -la
 # Deberías ver: pom.xml, src/, Dockerfile, k8s/, target/
 ```
-
-### Opción B: Si retomas desde punto específico
-
-Si hay una rama `u2-starter` en repositorio:
-
-```bash
-git checkout u2-starter
-cd unidad-2-kubernetes/02-laboratorio/proyecto-base-unidad-02/
-```
-
-**Qué incluye `u2-starter`:**
-- ✅ `catalog-service/` completo (Laboratorio 1.3 output)
-- ✅ `CatalogResource.java` con 4 anotaciones de resiliencia
-- ✅ `pom.xml` con dependencias Quarkus (rest-jackson, smallrye-health, smallrye-fault-tolerance)
-- ✅ `Dockerfile` Red Hat UBI9 (heredado de Laboratorio 1.3)
-- ✅ `k8s/01-deployment.yaml` y `k8s/02-service.yaml`
-- ✅ Imagen `catalog-service:1.0.0` ya disponible en Docker Hub
 
 ---
 
@@ -1362,15 +1343,15 @@ inventory-service-xxxdef        2         2         2       4m       ← v1.1.0 
 ### ![linux](images/linux.png) Linux/macOS
 
 ```bash
-# Eliminar el Pod de load-gen de Kubernetes
-kubectl delete pod load-gen
+# Eliminar pod load-gen (forzado para más rapidez)
+kubectl delete pod load-gen --ignore-not-found=true --grace-period=0 --force
 ```
 
 ### ![win](images/windows.png) Windows
 
 ```powershell
-# Eliminar el Pod de load-gen de Kubernetes
-kubectl delete pod load-gen
+# Eliminar pod load-gen (forzado para más rapidez)
+kubectl delete pod load-gen --ignore-not-found=true --grace-period=0 --force
 ```
 
 ### Nota Pedagógica
