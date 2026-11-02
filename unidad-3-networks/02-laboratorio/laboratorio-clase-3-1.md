@@ -166,7 +166,7 @@ spec:
     spec:
       containers:
       - name: payment-service
-        image: ebrena/payment-service:1.0.0
+        image: <tu-usuario-dockerhub>/payment-service:1.0.0
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -379,7 +379,7 @@ kubectl logs -n production pod/payment-service-xxx
 kubectl describe pod -n production pod/payment-service-xxx
 
 # Verificar imagen (si usas Docker local en Minikube)
-minikube image load ebrena/payment-service:1.0.0
+minikube image load <tu-usuario-dockerhub>/payment-service:1.0.0
 
 # Redeployar
 kubectl rollout restart deployment/payment-service -n production

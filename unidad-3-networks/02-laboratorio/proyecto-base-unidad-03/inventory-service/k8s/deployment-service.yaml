@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
       - name: inventory-service
-        image: ebrena/inventory-service:1.0.0
+        image: <tu-usuario-dockerhub>/inventory-service:1.0.0
         imagePullPolicy: Always            # Siempre tira imagen fresca de Docker Hub
         ports:
         - containerPort: 8080

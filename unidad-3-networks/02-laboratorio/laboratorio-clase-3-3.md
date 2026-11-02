@@ -191,7 +191,7 @@ spec:
       
       containers:
       - name: payment-service
-        image: ebrena/payment-service:1.0.0
+        image: <tu-usuario-dockerhub>/payment-service:1.0.0
         imagePullPolicy: Always
         
         ports:
@@ -480,10 +480,10 @@ echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main"
 apt-get update && apt-get install trivy
 
 # Escanear imagen
-trivy image ebrena/payment-service:1.0.0
+trivy image <tu-usuario-dockerhub>/payment-service:1.0.0
 
 # Salir con error si hay críticas
-trivy image --exit-code 1 --severity CRITICAL ebrena/payment-service:1.0.0
+trivy image --exit-code 1 --severity CRITICAL <tu-usuario-dockerhub>/payment-service:1.0.0
 ```
 
 **Esperado:** Reporte de vulnerabilidades encontradas (o ninguna si está bien endurecida).
