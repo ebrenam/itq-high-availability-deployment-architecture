@@ -32,18 +32,12 @@ unidad-1-ha-architecture/
 │   ├── images/                      # Screenshots y diagramas de laboratorios
 │   │
 │   └── proyecto-base-unidad-01/     # CÓDIGO FUNCIONAL — Catalog Service
-│       └── catalog-service/         # Microservicio resiliente
+│       └── catalog-service/         # Servicio base que evoluciona con los laboratorios
 │           ├── README.md            # Setup rápido + referencias a laboratorios
-│           ├── src/main/java/.../
-│           │   └── CatalogResource.java      # Editarás aquí (Labs 1.1→1.2→1.3)
-│           ├── src/main/resources/
-│           │   └── application.properties    # Config Quarkus
-│           ├── k8s/
-│           │   ├── 01-deployment.yaml        # Editarás aquí (Lab 1.3)
-│           │   └── 02-service.yaml           # Editarás aquí (Lab 1.3)
-│           ├── pom.xml                       # Dependencies (Quarkus 3.38.0)
-│           ├── Dockerfile                    # Imagen Docker multi-stage
-│           └── target/                       # Build artifacts
+│           ├── src/                 # Código fuente y configuración de Quarkus
+│           ├── k8s/                 # Manifiestos para el despliegue (Lab 1.3)
+│           ├── pom.xml              # Dependencias y configuración de Maven
+│           └── Dockerfile           # Construcción de la imagen del servicio
 ```
 
 ## Contenido de clases

@@ -29,9 +29,9 @@ Endpoints:
 
 Consulta los detalles de ejecución, troubleshooting y despliegue en los archivos de laboratorio:
 
-- [Laboratorio 1.1](../laboratorio-clase-1-1.md) — Línea base de disponibilidad
-- [Laboratorio 1.2](../laboratorio-clase-1-2.md) — Patrones de resiliencia básicos
-- [Laboratorio 1.3](../laboratorio-clase-1-3.md) — Despliegue en Kubernetes
+- [Laboratorio 1.1](../../laboratorio-clase-1-1.md) — Línea base de disponibilidad
+- [Laboratorio 1.2](../../laboratorio-clase-1-2.md) — Patrones de resiliencia básicos
+- [Laboratorio 1.3](../../laboratorio-clase-1-3.md) — Despliegue en Kubernetes
 - **Unidad 5**: Integrar observabilidad con Prometheus, Grafana y OpenTelemetry
 
 ## 🤝 Contribución
