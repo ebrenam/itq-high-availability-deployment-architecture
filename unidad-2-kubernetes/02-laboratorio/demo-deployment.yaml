@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-demo-quarkus
+  namespace: default
+  labels:
+    app: core-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: core-demo
+  template:
+    metadata:
+      labels:
+        app: core-demo
+    spec:
+      containers:
+        - name: quarkus-app
+          image: <tu-usuario-dockerhub>/catalog-service:1.0.0
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
