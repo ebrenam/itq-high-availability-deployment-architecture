@@ -4,9 +4,9 @@
 
 - Configurar mecanismos de acceso externo y balanceo de carga para microservicios desplegados en Kubernetes.
 
-- Implementar políticas de red para controlar la comunicación entre servicios dentro del clúster.
+- Implementar NetworkPolicies para controlar el tráfico entre Pods cuando el CNI del clúster las soporte.
 
-- Aplicar controles de seguridad en el despliegue y la exposición de servicios.
+- Aplicar controles de autorización, admisión y seguridad de Pods.
 
 ## Estructura de la Unidad
 
@@ -15,14 +15,14 @@ unidad-3-networks/
 ├── README.md                        # Este archivo
 │
 ├── 01-clase/                        # TEORÍA — Conceptos y principios
-│   ├── clase-3-1.md                 # Balanceo de carga, Services, Ingress, LoadBalancers
+│   ├── clase-3-1.md                 # Balanceo, Services, Ingress y Gateway API
 │   ├── clase-3-2.md                 # Redes del clúster, NetworkPolicies, aislamiento
-│   ├── clase-3-3.md                 # Seguridad: RBAC, SecurityContext, Pod Security Standards
+│   ├── clase-3-3.md                 # Seguridad: RBAC, SecurityContext, Pod Security Admission
 │
 ├── 02-laboratorio/                  # PRÁCTICA — Implementación hands-on
-│   ├── laboratorio-clase-3-1.md     # Lab 3.1: Ingress y TLS
+│   ├── laboratorio-clase-3-1.md     # Lab 3.1: Gateway API, Envoy Gateway y TLS
 │   ├── laboratorio-clase-3-2.md     # Lab 3.2: NetworkPolicies
-│   ├── laboratorio-clase-3-3.md     # Lab 3.3: RBAC y SecurityContext
+│   ├── laboratorio-clase-3-3.md     # Lab 3.3: RBAC, PSA y SecurityContext
 │   ├── images/                      # Screenshots y diagramas de laboratorios
 │   │
 │   └── proyecto-base-unidad-03/     # Servicios heredados y punto de partida
@@ -38,19 +38,19 @@ unidad-3-networks/
 │           └── Dockerfile
 ```
 
-**Nota sobre el punto de partida:** El proyecto base contiene `catalog-service` e `inventory-service`, pero no incluye `payment-service`. Sin embargo, los laboratorios 3.1–3.3 lo asumen como disponible. Hace falta agregarlo al proyecto base o actualizar las instrucciones de los laboratorios antes de ejecutar esa secuencia.
+**Punto de partida:** El proyecto base contiene `catalog-service` e `inventory-service`. El Laboratorio 3.1 crea un `payment-service` de demostración (respuesta HTTP estática); no es un servicio de pagos real ni requiere construir una imagen propia.
 
 ## Contenido de clases
 
 ### **3.1 Balanceo de carga y acceso externo**
 - Tipos de exposición de servicios: ClusterIP, NodePort, LoadBalancer, ExternalName
 - Arquitectura de Services como balanceadores L4
-- Ingress Controllers y enrutamiento L7 (HTTP/HTTPS)
+- Ingress y Gateway API para enrutamiento L7 (HTTP/HTTPS)
 - Gestión de certificados TLS/SSL
-- **Laboratorio:** Exponer payment-service con Ingress y TLS
+- **Laboratorio:** Exponer payment-service con Gateway API y TLS; comparar con Ingress
 
 ### **3.2 Redes del clúster y políticas de comunicación**
-- Fundamentos de la red interna de Kubernetes (CNI, red overlay)
+- Fundamentos de la red interna de Kubernetes (CNI y modelos de red)
 - Control del tráfico entre pods y namespaces
 - NetworkPolicies: sintaxis, selectores, reglas Ingress/Egress
 - Validación de aislamiento y comunicación permitida
@@ -59,9 +59,9 @@ unidad-3-networks/
 ### **3.3 Seguridad en el despliegue y acceso**
 - RBAC (Role-Based Access Control): Roles, RoleBindings, ServiceAccounts
 - SecurityContext: usuarios no-root, capacidades, privilegios
-- Pod Security Standards (Restricted, Baseline, Unrestricted)
+- Pod Security Standards (Privileged, Baseline, Restricted) y Pod Security Admission
 - Principios de mínimo privilegio
-- **Laboratorio:** Aplicar RBAC y SecurityContext restrictivos
+- **Laboratorio:** Aplicar RBAC, PSA y SecurityContext
 
 ---
 
@@ -83,14 +83,13 @@ Si necesitas refrescar esos conceptos, revisa [Unidad 2: Kubernetes — Fundamen
 |---|---|---|
 | **U2: Orquestación en Kubernetes** | **U3: Redes y Seguridad** | **U4: CI/CD y Automatización** |
 | Desplegarás microservicios básicos en K8s | Expondrás y asegurarás acceso a servicios | Automatizarás build, test y despliegue |
-| Usarás Deployments, Services, HPA, ConfigMaps | Usarás Ingress, NetworkPolicy, RBAC, SecurityContext | Usarás GitOps, pipelines, ArgoCD |
-| ~95% disponibilidad en clúster local | ~95% + políticas de red y RBAC | ~95% + automatización y observabilidad |
+| Usarás Deployments, Services, HPA, ConfigMaps | Usarás Gateway API, NetworkPolicy, RBAC y Pod Security Admission | Usarás GitOps, pipelines, ArgoCD |
 
 ---
 
 ## Punto de partida recomendado
 
-La unidad parte de `02-laboratorio/proyecto-base-unidad-03/`, que contiene `catalog-service` e `inventory-service`, heredados de la Unidad 2. Los laboratorios también requieren `payment-service`, pero ese servicio no está actualmente en el proyecto base; resuelve esta diferencia antes de seguir la secuencia práctica.
+La unidad parte de `02-laboratorio/proyecto-base-unidad-03/`, que contiene `catalog-service` e `inventory-service`, heredados de la Unidad 2. El Laboratorio 3.1 crea un `payment-service` de demostración; no procesa pagos ni requiere una imagen propia. Los dos servicios heredados son escenarios opcionales para extender las prácticas, no requisitos para completar la secuencia base.
 
 ---
 
@@ -99,28 +98,27 @@ La unidad parte de `02-laboratorio/proyecto-base-unidad-03/`, que contiene `cata
 ### Flujo recomendado
 
 1. **Prerequisito:** Completar [Unidad 2: Kubernetes — Fundamentos y despliegue](../unidad-2-kubernetes/README.md)
-2. **Punto de partida:** Usar `02-laboratorio/proyecto-base-unidad-03/` y verificar que estén disponibles los tres servicios requeridos. Actualmente falta `payment-service` en el proyecto base.
+2. **Punto de partida:** Usar `02-laboratorio/proyecto-base-unidad-03/`. El Laboratorio 3.1 crea el servicio de demostración; los servicios `catalog-service` e `inventory-service` son extensiones opcionales.
 3. **Secuencia del laboratorio:**
-   - Laboratorio 3.1: Implementar **Ingress + TLS** para exponer servicios
-   - Laboratorio 3.2: Aplicar **NetworkPolicies** para aislar tráfico
-   - Laboratorio 3.3: Configurar **RBAC + SecurityContext** para endurecimiento
+   - Laboratorio 3.1: Crear `payment-service` y exponerlo con **Gateway API + TLS**
+   - Laboratorio 3.2: Aplicar **NetworkPolicies** para aislar tráfico (si el CNI las implementa)
+   - Laboratorio 3.3: Configurar **RBAC + Pod Security Admission + SecurityContext**
 
 ### Información rápida
 
-- **Duración estimada:** 6-8 horas (3 clases de 1-2 horas + 1 laboratorio integrador de 3-4 horas)
-- **Tecnología:** Kubernetes (Minikube/Kind), kubectl, NGINX Ingress Controller, OpenSSL
+- **Duración estimada:** 6-8 horas (3 clases y 3 laboratorios; ajustable según experiencia y entorno)
+- **Tecnología:** Kubernetes (Minikube/Kind), kubectl, Gateway API, Envoy Gateway, Helm, OpenSSL y curl
 - **Nivel de dificultad:** Avanzado (requiere completar U2)
-- **Resultado esperado:** Plataforma e-commerce con 3 microservicios expuestos de forma segura (Ingress + NetworkPolicy + RBAC), una vez disponible `payment-service`
-- **Componente requerido:** `payment-service`; los laboratorios lo asumen, pero no está incluido actualmente en el proyecto base
+- **Resultado esperado:** Endpoint de demostración expuesto por HTTPS con Gateway API y un Pod endurecido; NetworkPolicy se valida si el CNI la implementa
 
 ---
 
 ## Competencias ganadas
 
 **Específicas:**
-- Configurar Ingress Controllers y Load Balancers
+- Configurar Services y entrada HTTP con Gateway API; comprender el modelo Ingress
 - Implementar políticas de red (NetworkPolicies)
-- Aplicar RBAC y SecurityContext
+- Aplicar RBAC, Pod Security Admission y SecurityContext
 
 **Genéricas:**
 - Administración segura de infraestructura
@@ -129,31 +127,39 @@ La unidad parte de `02-laboratorio/proyecto-base-unidad-03/`, que contiene `cata
 
 ## Bibliografía
 
-- Cloud Native Computing Foundation (CNCF). (2024). _Concepts: Services, Load Balancing, and Networking_. Kubernetes Documentation. <https://kubernetes.io/docs/concepts/services-networking/>
+- Kubernetes Authors. _Services, Load Balancing, and Networking_. <https://kubernetes.io/docs/concepts/services-networking/>
 
-- Cloud Native Computing Foundation (CNCF). (2024). _Network Policies_. Kubernetes Documentation. <https://kubernetes.io/docs/concepts/services-networking/network-policies/>
+- Kubernetes Authors. _Network Policies_. <https://kubernetes.io/docs/concepts/services-networking/network-policies/>
 
-- Cloud Native Computing Foundation (CNCF). (2024). _Ingress_. Kubernetes Documentation. <https://kubernetes.io/docs/concepts/services-networking/ingress/>
+- Kubernetes Authors. _Ingress_. La API está estable pero congelada; Kubernetes recomienda Gateway API para desarrollos nuevos. <https://kubernetes.io/docs/concepts/services-networking/ingress/>
 
-- Cloud Native Computing Foundation (CNCF). (2024). _Using RBAC Authorization_. Kubernetes Documentation. <https://kubernetes.io/docs/reference/access-authn-authz/rbac/>
+- Kubernetes SIG Network. _Gateway API: Getting Started_. <https://gateway-api.sigs.k8s.io/guides/getting-started/introduction/>
 
-- Cloud Native Computing Foundation (CNCF). (2024). _Pod Security Standards_. Kubernetes Documentation. <https://kubernetes.io/docs/concepts/security/pod-security-standards/>
+- Envoy Gateway. _Quickstart_. <https://gateway.envoyproxy.io/docs/tasks/quickstart/>
 
-- Cloud Native Computing Foundation (CNCF). (2024). _Security_. Kubernetes Documentation. <https://kubernetes.io/docs/concepts/security/>
+- Envoy Gateway. _Compatibility Matrix_. <https://gateway.envoyproxy.io/news/releases/matrix/>
 
-- Cloud Native Computing Foundation (CNCF). (2024). _Istio Documentation: Security_. <https://istio.io/latest/docs/concepts/security/>
+- Kubernetes Authors. _Using RBAC Authorization_. <https://kubernetes.io/docs/reference/access-authn-authz/rbac/>
 
-- Hightower, K., Burns, B., & Beda, J. (2017). _Kubernetes Up and Running: Dive Into the Future of Infrastructure_ (2nd ed.). O'Reilly Media. ISBN 978-1492046523. (Capítulos 7-8: Services y Ingress)
+- Kubernetes Authors. _Pod Security Standards_. <https://kubernetes.io/docs/concepts/security/pod-security-standards/>
 
-- Müller, J., & Gerschpacher, T. (2022). _Kubernetes Best Practices: Blueprints for Building Successful Applications on Kubernetes_ (2nd ed.). O'Reilly Media. (Capítulos de seguridad y networking)
+- Kubernetes Authors. _Pod Security Admission_. <https://kubernetes.io/docs/concepts/security/pod-security-admission/>
 
-- OWASP. (2024). _Kubernetes Security_. <https://owasp.org/www-project-kubernetes-top-ten/>
+- Kubernetes Authors. _Service Accounts_. <https://kubernetes.io/docs/concepts/security/service-accounts/>
+
+- Kubernetes Authors. _Good practices for Kubernetes Secrets_. <https://kubernetes.io/docs/concepts/security/secrets-good-practices/>
+
+- Kubernetes Authors. _RBAC good practices_. <https://kubernetes.io/docs/concepts/security/rbac-good-practices/>
+
+- Kubernetes SIG Network. _Ingress NGINX Retirement_. <https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/>
+
+- National Institute of Standards and Technology. (2020). _Zero Trust Architecture (SP 800-207)_. <https://csrc.nist.gov/pubs/sp/800/207/final>
 
 ---
 
 ## Conexión con la asignatura y el proyecto integrador
 
-Esta unidad fortalece la arquitectura desplegada en Unidad 2 al definir cómo entra el tráfico al sistema (Ingress), cómo se controla la comunicación interna (NetworkPolicies) y qué mecanismos de seguridad se requieren para operar microservicios expuestos en un entorno productivo (RBAC, SecurityContext, Pod Security Standards). 
+Esta unidad fortalece la arquitectura desplegada en Unidad 2 al definir cómo entra el tráfico al sistema (Gateway API y el modelo Ingress), cómo se controla la comunicación interna (NetworkPolicies, si el CNI las implementa) y cómo se aplican controles de autorización y seguridad de Pods (RBAC, Pod Security Admission y SecurityContext).
 
 El estudiante cierra el ciclo de seguridad multicapa: desde patrones de resiliencia en código (U1) → orquestación en infraestructura (U2) → **exposición y aseguramiento de servicios (U3)** → automatización completa (U4).
 

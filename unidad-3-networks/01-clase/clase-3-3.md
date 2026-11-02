@@ -4,7 +4,7 @@ En la sesión anterior analizamos cómo asegurar la conectividad interna mediant
 
 ## 1. Explicación conceptual
 
-En Kubernetes, la seguridad de acceso y despliegue opera bajo la premisa de que todo punto de acceso —ya sea un ingeniero ejecutando `kubectl` o un microservicio en Java con Quarkus consultando la API— debe ser autenticado y autorizado bajo el principio de mínimo privilegio (_Least Privilege_).
+En Kubernetes, la seguridad de acceso y despliegue opera bajo la premisa de que todo punto de acceso —ya sea un operador ejecutando `kubectl` o una carga que necesita consultar la API— debe autenticarse y autorizarse con el principio de mínimo privilegio (_Least Privilege_).
 
 ### 1.1 Control de acceso basado en roles (RBAC)
 
@@ -12,7 +12,7 @@ La autorización en la API del clúster se gestiona mediante cuatro objetos fund
 
 - **`Role`:** Define un conjunto de permisos (verbos como `get`, `list`, `create`) sobre recursos específicos (`pods`, `services`) dentro de un _namespace_ delimitado.
 
-- **`ClusterRole`:** Define permisos a nivel de todo el clúster (recursos no asociados a _namespaces_ como `nodes`, `persistentvolumes`, o recursos globales en todos los _namespaces_).
+- **`ClusterRole`:** Define un conjunto de permisos reutilizable para recursos con o sin _namespace_. El alcance efectivo depende del vínculo: un `RoleBinding` puede otorgarlo en un solo _namespace_; un `ClusterRoleBinding` puede otorgarlo en todo el clúster.
 
 - **`RoleBinding`:** Vincula un `Role` o `ClusterRole` a un sujeto (usuario, grupo o `ServiceAccount`) restringiendo el alcance únicamente a un _namespace_ específico.
 
@@ -20,17 +20,17 @@ La autorización en la API del clúster se gestiona mediante cuatro objetos fund
 
 ### 1.2 Identidad para aplicaciones: serviceaccounts
 
-Los usuarios humanos suelen autenticarse mediante proveedores OIDC o certificados X.509, pero las cargas de trabajo (_workloads_) utilizan **`ServiceAccounts`**. Cuando un _pod_ se ejecuta con una `ServiceAccount`, Kubernetes inyecta un _JSON Web Token_ (JWT) firmado de corta duración en `/var/run/secrets/kubernetes.io/serviceaccount/token`. Este token le permite a la aplicación realizar peticiones autenticadas contra la API Server de Kubernetes.
+Los usuarios humanos suelen autenticarse mediante proveedores OIDC o certificados X.509, mientras que las cargas de trabajo pueden identificarse con **`ServiceAccounts`**. De forma predeterminada, Kubernetes proyecta en el Pod un token obtenido mediante la API `TokenRequest`; es de duración limitada y el kubelet lo rota. La aplicación puede usarlo para autenticarse ante el API Server, pero la identidad no concede permisos por sí sola: la autorización depende de RBAC y no todos los Pods necesitan un token. Se puede desactivar su montaje automático con `automountServiceAccountToken: false`.
 
 ### 1.3 Gestión de datos sensibles e integración con Key Vaults
 
-Los objetos **`Secret`** nativos de Kubernetes guardan datos confidenciales (contraseñas, tokens API). Sin embargo, por defecto están codificados únicamente en `Base64` y se almacenan sin encriptar en `etcd` (a menos que se active _encryption-at-rest_). En entornos de producción cloud-native, la mejor práctica consiste en externalizar el ciclo de vida de los secretos hacia un gestor dedicado (Azure Key Vault, HashiCorp Vault, AWS Secrets Manager) e integrarlos al clúster utilizando controladores como **External Secrets Operator (ESO)** o **Secrets Store CSI Driver**.
+Los objetos **`Secret`** nativos de Kubernetes guardan datos confidenciales (contraseñas, tokens API). Sus valores se representan en Base64, que no es cifrado; por defecto se almacenan sin cifrar en `etcd`, salvo que se configure _encryption at rest_. En producción, valora un gestor de secretos externo y define cómo llegan los datos a las cargas: External Secrets Operator suele sincronizarlos a objetos `Secret` de Kubernetes, mientras Secrets Store CSI Driver puede montarlos desde un proveedor externo en volúmenes.
 
 ### 1.4 Seguridad de la carga de trabajo y cadena de suministro
 
-- **Pod Security Standards (PSS) & Admission Controllers:** Reemplazaron a las antiguas _PodSecurityPolicies_. PSS categoriza el endurecimiento de los contenedores en tres niveles: _Privileged_ (sin restricciones), _Baseline_ (previene escalación de privilegios conocida) y _Restricted_ (exige ejecución como usuario no-root, aislamiento del sistema de archivos de solo lectura y deshabilitación de capacidades del Kernel).
+- **Pod Security Standards (PSS) y Pod Security Admission (PSA):** PSS define tres perfiles acumulativos: _Privileged_, _Baseline_ y _Restricted_. PSA es el mecanismo integrado de admisión que aplica esos perfiles mediante modos como `enforce`, `audit` y `warn`. `Restricted` exige, entre otros controles, ejecución no-root, `allowPrivilegeEscalation: false`, `seccompProfile` permitido y eliminar todas las capabilities (solo permite agregar `NET_BIND_SERVICE` como excepción). Un filesystem raíz de solo lectura es una medida de endurecimiento útil, pero **no** es requisito de PSS `Restricted`.
 
-- **Escaneo y firma de imágenes:** La seguridad de la cadena de suministro (_supply chain_) exige que toda imagen en el _registry_ sea escaneada contra vulnerabilidades conocidas (CVEs) antes del despliegue y validada mediante firmas digitales usando herramientas como **Cosign** / **Sigstore** a través de un _validating admission webhook_ (ej. Kyverno u OPA/Gatekeeper).
+- **Escaneo y firma de imágenes:** Una política de cadena de suministro puede escanear imágenes frente a vulnerabilidades conocidas y requerir firmas verificables antes del despliegue. Cosign/Sigstore genera y verifica firmas; para hacer cumplir una política en admisión se necesita un controlador y una política configurados (por ejemplo, Kyverno o Gatekeeper).
 
 ---
 
@@ -38,7 +38,7 @@ Los objetos **`Secret`** nativos de Kubernetes guardan datos confidenciales (con
 
 Imagina la seguridad de un hotel de alta gama:
 
-- **ServiceAccount (La credencial del personal):** Es el gafete con chip que se le entrega a un empleado. La credencial no dice quién es la persona individualmente, sino el rol que cumple durante su turno de trabajo.
+- **ServiceAccount (La identidad de una carga):** Es una credencial de servicio asignada a un proceso. Identifica al sujeto; los permisos que tiene se definen por separado mediante RBAC.
 
 - **RBAC (Los permisos del chip):**
 
@@ -56,6 +56,8 @@ Imagina la seguridad de un hotel de alta gama:
 
 ## 3. Arquitectura de Seguridad Multinivel
 
+El diagrama es un ejemplo de una carga que sí consulta el API Server; no todas las aplicaciones necesitan token ni permisos de API.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ Kubernetes Cluster (kube-apiserver)                         │
@@ -63,7 +65,7 @@ Imagina la seguridad de un hotel de alta gama:
 │                                                               │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │ Namespace: apps                                      │   │
-│  │ PSS Enforce: Restricted (no root, read-only fs)     │   │
+│  │ PSA Enforce: Restricted                             │   │
 │  ├──────────────────────────────────────────────────────┤   │
 │  │                                                       │   │
 │  │  ┌────────────────────────────────────────────────┐  │   │
@@ -72,12 +74,11 @@ Imagina la seguridad de un hotel de alta gama:
 │  │  │ ├─ SecurityContext: runAsNonRoot: true         │  │   │
 │  │  │ └─ Container: readOnlyRootFilesystem: true     │  │   │
 │  │  │                                                 │  │   │
-│  │  │ Pod ───→ (injected JWT token)                  │  │   │
-│  │  │           ├─ Path: /var/run/secrets/.../token  │  │   │
-│  │  │           └─ Issuer: kube-apiserver            │  │   │
+│  │  │ Pod ───→ (projected, rotating token, optional) │  │   │
+│  │  │           └─ TokenRequest API                  │  │   │
 │  │  └────────────────────────────────────────────────┘  │   │
 │  │           │ ↓ (authenticated request)                │   │
-│  │           │ kubectl get pods --token=<JWT>         │   │
+│  │           │ request authenticated as ServiceAccount│   │
 │  │           ▼                                         │   │
 │  │  ┌────────────────────────────────────────────────┐  │   │
 │  │  │ RBAC RoleBinding                                │  │   │
@@ -90,7 +91,7 @@ Imagina la seguridad de un hotel de alta gama:
 │  │           │ ❌ Bloqueado: delete pods              │   │
 │  │           ▼                                         │   │
 │  │  ┌────────────────────────────────────────────────┐  │   │
-│  │  │ kube-apiserver Response: 200 OK                │  │   │
+│  │  │ API server response: allowed/forbidden         │  │   │
 │  │  │ {"items": [...pods en namespace apps...]}      │  │   │
 │  │  └────────────────────────────────────────────────┘  │   │
 │  │                                                       │   │
@@ -103,19 +104,19 @@ Imagina la seguridad de un hotel de alta gama:
 
 1. **Capas de Autenticación (¿Quién eres?):**
    - Usuario: OIDC / Certificado X.509
-   - Pod: ServiceAccount JWT (inyectado automáticamente)
+   - Pod: token proyectado de ServiceAccount (si está habilitado)
 
 2. **Capa de Autorización (¿Qué puedes hacer?):**
    - RBAC evalúa Role + RoleBinding
    - Respuesta: Permitido / Denegado
 
-3. **Capa de Admisión (¿Puedes entrar con eso?):**
-   - Pod Security Standards valida el manifiesto
-   - Respuesta: Acepta / Rechaza antes de desplegar
+3. **Capa de Admisión (¿Cumple la política de Pods?):**
+   - Pod Security Admission evalúa el Pod según el perfil y modo del namespace
+   - Respuesta: admite, advierte, audita o rechaza según el modo
 
-4. **Capa de Aislamiento (¿Dónde puedes estar?):**
-   - SecurityContext aísla el contenedor (user, filesystem, capabilities)
-   - NetworkPolicy aísla la comunicación entre pods
+4. **Capa de endurecimiento y conectividad:**
+   - `SecurityContext` configura atributos de seguridad del proceso y el contenedor (usuario, filesystem y capabilities)
+   - `NetworkPolicy` controla flujos de red entre Pods, si el CNI implementa las políticas
 
 ---
 
@@ -131,10 +132,8 @@ Imagina la seguridad de un hotel de alta gama:
 | `patch` | Cambios incrementales en recursos |
 | `delete` | Eliminar recursos |
 | `deletecollection` | Eliminar múltiples recursos |
-| `exec` | Ejecutar comandos dentro de un pod |
-| `logs` | Ver logs de un pod |
-| `portforward` | Túnel local a puertos de pods |
-| `port-forward` | Alias de `portforward` |
+
+`exec`, `logs` y `port-forward` no son verbos RBAC. Se autorizan como subrecursos: por ejemplo, `pods/exec` y `pods/portforward` suelen requerir `create`; `pods/log` suele requerir `get`. El verbo exacto depende de la operación HTTP que haga el cliente.
 
 **Ejemplo de política restrictiva:**
 
@@ -157,9 +156,9 @@ rules:
 
 | Nivel | Restricciones | Caso de Uso |
 |-------|--------------|-----------|
-| **Privileged** | Sin restricciones. Permite todo (root, privilegios, etc.) | Solo para contenedores de infraestructura (kubelet, CNI) |
+| **Privileged** | Sin restricciones. Permite todo (root, privilegios, etc.) | Solo para Pods de infraestructura que realmente requieran esas capacidades, como algunos componentes CNI |
 | **Baseline** | Previene escalación de privilegios conocida | Desarrollo, aplicaciones heredadas que necesitan permisos básicos |
-| **Restricted** | Máximo endurecimiento (no root, read-only fs, sin capabilities) | Producción, aplicaciones cloud-native modernas |
+| **Restricted** | Endurecimiento fuerte; requiere, entre otros, no-root, `allowPrivilegeEscalation: false`, seccomp permitido y `drop: ["ALL"]`. No exige filesystem raíz de solo lectura. | Workloads que pueden cumplir el perfil |
 
 **Enforcing Restricted en un namespace:**
 
@@ -172,13 +171,13 @@ metadata:
     pod-security.kubernetes.io/enforce-version: latest
 ```
 
-Si intentas desplegar un pod que viola estas restricciones, Kubernetes rechaza la solicitud con un error 403.
+Si el namespace usa modo `enforce` y el Pod incumple el perfil, la admisión lo rechaza. Antes de activar `enforce` en un namespace existente, revisa todos sus workloads, ya que las nuevas creaciones y actualizaciones de Pods también se evaluarán.
 
 ---
 
 ## 6. Cadena de Suministro: Escaneo e Integridad de Imágenes
 
-En producción, **nunca** uses `latest` o tags sin verificar vulnerabilidades:
+En producción, evita tags mutables como `latest`; fija imágenes por digest o usa tags inmutables y aplica un proceso de análisis y validación:
 
 ```
 1. Desarrollador: Construye imagen y sube a registry
@@ -207,7 +206,7 @@ En producción, **nunca** uses `latest` o tags sin verificar vulnerabilidades:
 
 ## 7. Laboratorio
 
-Para completar esta parte, sigue el [Laboratorio de la clase 3.3](../02-laboratorio/laboratorio-clase-3-3.md). Allí encontrarás todos los pasos, código y procedimientos necesarios para configurar Pod Security Standards, crear ServiceAccounts con permisos mínimos, implementar RBAC, validar SecurityContext y realizar escaneo de imágenes.
+Para completar esta parte, sigue el [Laboratorio de la clase 3.3](../02-laboratorio/laboratorio-clase-3-3.md). Allí configurarás Pod Security Admission, aplicarás una ServiceAccount sin token innecesario, comprobarás permisos RBAC y actualizarás el Deployment mediante RollingUpdate.
 
 ---
 
@@ -239,3 +238,12 @@ Para cumplir esto, implementaste:
 2. Diseña una estrategia de onboarding para desarrolladores nuevos: ¿Cómo les enseñarías que escriban código cloud-native sin que vayan contra el RBAC y NetworkPolicy?
 
 3. Si un desarrollador dice *"En desarrollo todo debe funcionar sin restricciones"* pero luego despliega ese código en producción, ¿qué controles en el pipeline CI/CD implementarías para evitar sorpresas?
+
+## Fuentes primarias
+
+- Kubernetes Authors. _Pod Security Standards_. <https://kubernetes.io/docs/concepts/security/pod-security-standards/>
+- Kubernetes Authors. _Pod Security Admission_. <https://kubernetes.io/docs/concepts/security/pod-security-admission/>
+- Kubernetes Authors. _Service Accounts_. <https://kubernetes.io/docs/concepts/security/service-accounts/>
+- Kubernetes Authors. _RBAC Authorization_. <https://kubernetes.io/docs/reference/access-authn-authz/rbac/>
+- Kubernetes Authors. _RBAC good practices_. <https://kubernetes.io/docs/concepts/security/rbac-good-practices/>
+- Kubernetes Authors. _Good practices for Kubernetes Secrets_. <https://kubernetes.io/docs/concepts/security/secrets-good-practices/>

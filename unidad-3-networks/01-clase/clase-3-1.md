@@ -4,11 +4,13 @@ En la sesión anterior analizamos cómo externalizar configuraciones y escalar r
 
 ## 1. Explicación conceptual
 
-En Kubernetes, los _pods_ son efímeros. Tienen direcciones IP dinámicas que cambian cada vez que un _pod_ se destruye, escala o se reprograma en otro nodo. Si intentaras conectar un cliente externo directamente a la IP de un _pod_, el enlace se rompería en cuestión de minutos.
+En Kubernetes, los _pods_ son efímeros. Su dirección IP puede cambiar cuando un Pod se reemplaza o se programa de nuevo. Por eso, conectar un cliente directamente a la IP de un Pod no ofrece un destino estable.
 
-Para resolver este problema de direccionamiento inestable, Kubernetes abstrae la capa de red mediante dos primitivas fundamentales: los **Services** y los controladores de **Ingress**.
+Para resolver este problema de direccionamiento inestable, Kubernetes ofrece **Services** y recursos de entrada HTTP como **Ingress** y **Gateway API**.
 
-![ingress](images/image-01.jpg)
+![Esquema conceptual de entrada HTTP mediante un controlador y un Service](images/image-01.jpg)
+
+El esquema representa una topología overlay concreta, no una exigencia de Kubernetes: la IP de Pod no implica que todos los clústeres usen overlay. `Ingress` y `Gateway` son recursos de API; el controlador implementa el proxy y el punto de entrada.
 
 ### 1.1 La capa de red de capa 4: Kubernetes Services
 
@@ -16,29 +18,25 @@ Un _Service_ es una abstracción que define un conjunto lógico de _pods_ y una 
 
 Existen cuatro tipos de objetos _Service_:
 
-- **`ClusterIP` (Por defecto):** Expone el servicio en una IP interna exclusiva del clúster. Es inalcanzable desde el exterior y se utiliza para la comunicación privada entre microservicios (por ejemplo, de una API a su base de datos).
+- **`ClusterIP` (por defecto):** Expone el servicio mediante una IP virtual del clúster, normalmente para consumo interno. Que un cliente externo pueda alcanzarla depende del enrutamiento de la plataforma; no es una forma estándar de exposición pública.
 
-- **`NodePort`:** Expone el servicio en un puerto estático (por defecto entre `30000-32767`) en la IP de cada nodo del clúster. Sirve como puente básico hacia el exterior, pero no es recomendable para producción debido a la gestión de puertos y falta de nombres de dominio.
+- **`NodePort`:** Expone el servicio en un puerto de cada nodo (por defecto del rango `30000-32767`). Puede formar parte de una arquitectura de entrada, por ejemplo detrás de un balanceador externo; por sí solo no proporciona nombres de dominio ni enrutamiento HTTP.
 
-- **`LoadBalancer`:** Integra el clúster con la API de un proveedor _cloud_ (OCI, AWS, GCP) para aprovisionar un balanceador de carga externo con IP pública. Este asigna el tráfico automáticamente a los puertos `NodePort` correspondientes.
+- **`LoadBalancer`:** Solicita un balanceador a una integración de infraestructura o proveedor. La disponibilidad de una dirección externa y la implementación del tráfico dependen de esa integración; algunas implementaciones utilizan `NodePort`, otras pueden enrutar de otra forma.
 
 - **`ExternalName`:** Mapea el servicio a un nombre DNS externo (mediante un registro `CNAME`), sin usar _selectors_ ni _pods_ locales.
 
-### 1.2 La capa de enrutamiento de capa 7: Ingress y API gateways
+### 1.2 Entrada HTTP: Ingress y Gateway API
 
-Aprovisionar un objeto `LoadBalancer` por cada microservicio en producción resulta costoso e ineficiente. Aquí entra el recurso **`Ingress`**.
+Aprovisionar un balanceador externo por cada microservicio puede no ser necesario. Los recursos **`Ingress`** y **Gateway API** permiten definir reglas HTTP/HTTPS hacia servicios del clúster; la infraestructura y los costos dependen del controlador y de la plataforma.
 
-Un _Ingress_ opera en la capa 7 del modelo OSI (HTTP/HTTPS) y actúa como un punto de entrada único para el clúster. Administra:
+Un recurso `Ingress` describe reglas HTTP(S); no implementa por sí mismo el proxy ni el punto de entrada. Requiere un **Ingress Controller** que observe y aplique sus reglas. La API `Ingress` sigue estable, pero está congelada: Kubernetes recomienda **Gateway API** para nuevas funcionalidades y diseños nuevos.
 
-- Enrutamiento basado en rutas (_path-based routing_, ej. `/api/v1/users`).
+Gateway API separa responsabilidades mediante recursos como `GatewayClass`, `Gateway` y `HTTPRoute`. Ambos modelos pueden describir enrutamiento por host y ruta y terminación TLS, sujeto a las funciones de la implementación elegida.
 
-- Enrutamiento basado en nombres de dominio (_host-based routing_, ej. `api.empresa.com`).
+Las funciones adicionales, como reescritura de URLs, límites de solicitudes o autenticación, no son uniformes: dependen de las capacidades del controlador o de extensiones de la plataforma.
 
-- Terminación de certificados SSL/TLS en el borde.
-
-- Balanceo de carga avanzado y reescritura de URLs.
-
-> **Nota arquitectónica:** El recurso `Ingress` por sí solo es únicamente una especificación de reglas. Requiere un **Ingress Controller** (como NGINX Ingress Controller, Traefik o HAProxy) ejecutándose en el clúster para procesar esas reglas y dirigir el tráfico. Para escenarios más complejos que requieren gestión de cuotas (_rate limiting_), autenticación OAuth2 o métricas detalladas, se integran **API Gateways** (como Kong o Envoy).
+> **Nota de mantenimiento:** Ingress NGINX fue retirado en marzo de 2026 y ya no recibe correcciones ni actualizaciones de seguridad. La práctica de esta unidad usa Envoy Gateway con Gateway API; Ingress se conserva como concepto y API existente, no como recomendación de controlador nuevo.
 
 ---
 
@@ -54,13 +52,15 @@ Imagina un gran edificio corporativo de oficinas:
 
 - **LoadBalancer:** Es contratar a un guardia de seguridad privado afuera del edificio que recibe a la gente en la banqueta y la canaliza por la escalera metálica correcta.
 
-- **Ingress Controller:** Es la recepción principal del edificio en la planta baja. Una sola puerta de entrada con un recepcionista que lee tu solicitud: si pides hablar con "Ventas", te dirige al ascensor B (_path-based_); si muestras una identificación VIP con acceso especial, te envía al piso ejecutivo con cifrado de seguridad (_TLS/SSL termination_).
+- **Controlador de entrada:** Es la recepción principal del edificio. El controlador aplica las reglas declaradas por `Ingress` o Gateway API y puede dirigir solicitudes por host o ruta; la terminación TLS depende de su configuración.
 
 ---
 
 ## 3. Arquitectura completa: Flujo de tráfico
 
-![traffic](images/image-02.jpg)
+![Esquema conceptual de cliente, controlador de entrada, Service y Pods](images/image-02.jpg)
+
+Este diagrama usa NGINX como ejemplo de controlador existente; el Laboratorio 3.1 implementa el patrón con Envoy Gateway y Gateway API.
 ---
 
 ## 4. Caso de uso real: Plataforma E-commerce
@@ -73,21 +73,13 @@ Imagina una plataforma de e-commerce con 3 microservicios:
 | **catalog-service** | ClusterIP | payment-service → HTTP | Datos de productos (privado) |
 | **inventory-service** | ClusterIP | payment-service → HTTP | Stock de productos (privado) |
 
-Con **un solo Ingress Controller**, exponemos payment-service con TLS, mientras catalog e inventory permanecen privadas (solo accesibles internamente).
+Con un **Gateway** implementado por un controlador, exponemos `payment-service` con TLS, mientras `catalog-service` e `inventory-service` permanecen como servicios internos, salvo que se configuren otras rutas de acceso.
 
-![traffic](images/image-03.jpg)
+![Esquema de servicios internos y entrada HTTP al servicio de pagos](images/image-03.jpg)
 
-Sin Ingress, necesitaríamos:
-- ❌ 3 LoadBalancers externos (costoso)
-- ❌ Gestionar 3 IPs públicas diferentes
-- ❌ 3 certificados TLS separados
-- ❌ Los clientes necesitarían saber 3 direcciones diferentes
+El diagrama es una arquitectura conceptual, no los servicios desplegados en el laboratorio: el `payment-service` de la práctica devuelve una respuesta estática de demostración y no realiza pagos. Un controlador puede compartir infraestructura de entrada entre rutas y servicios. La cantidad de balanceadores, direcciones y certificados no está fijada por `Ingress` o Gateway API: depende del diseño, del controlador y de la plataforma.
 
-Con Ingress:
-- ✅ 1 Ingress Controller
-- ✅ 1 dominio (checkout.local)
-- ✅ 1 certificado TLS centralizado
-- ✅ Los clientes ven solo el dominio público
+“Privado” en este esquema indica que el servicio no tiene una ruta de entrada externa configurada; no implica que el tráfico interno esté cifrado.
 
 ---
 
@@ -97,19 +89,23 @@ Con Ingress:
 
 ![mono](images/image-04.jpg)
 
-### Kubernetes sin Ingress (solo ClusterIP + NodePort)
+### Entrada HTTP con Gateway API
 
-![no-ingres](images/image-05.jpg)
+```mermaid
+flowchart LR
+    C[Cliente HTTPS] --> G[Envoy Gateway<br/>Gateway + HTTPRoute]
+    G --> S[Service ClusterIP]
+    S --> P1[Pod]
+    S --> P2[Pod]
+```
 
-### Kubernetes + Ingress (mejor práctica moderna)
-
-![ingress](images/image-06.jpg)
+La API `Service` proporciona descubrimiento y acceso estable a Pods tanto si el tráfico externo entra por NodePort, Ingress o Gateway API. Sin un controlador de entrada no hay reglas HTTP compartidas de esa capa; no significa que Kubernetes pierda el DNS interno de Services.
 
 ---
 
 ## 6. Laboratorio
 
-Para completar esta parte, sigue el [Laboratorio de la clase 3.1](../02-laboratorio/laboratorio-clase-3-1.md). Allí encontrarás todos los pasos, código y procedimientos necesarios para instalar NGINX Ingress Controller, crear certificados TLS, desplegar manifests y validar acceso seguro desde clientes externos.
+Para completar esta parte, sigue el [Laboratorio de la clase 3.1](../02-laboratorio/laboratorio-clase-3-1.md). Allí crearás un endpoint HTTP estático de demostración, instalarás Envoy Gateway, configurarás recursos Gateway API y TLS, y validarás el acceso local. El TLS del laboratorio termina en el Gateway; el tramo Gateway–Pod usa HTTP y no demuestra cifrado de extremo a extremo.
 
 ---
 
@@ -117,18 +113,25 @@ Para completar esta parte, sigue el [Laboratorio de la clase 3.1](../02-laborato
 
 **El escenario:**
 
-Tu empresa tiene una arquitectura con 5 microservicios desplegados en Kubernetes. Actualmente todos están expuestos a través de un único Ingress Controller NGINX usando terminación TLS en el borde:
+Tu empresa mantiene una arquitectura heredada con cinco microservicios expuestos mediante un controlador Ingress NGINX y terminación TLS en el borde:
 
 ```text
 Cliente → HTTPS:443 → Ingress Controller → HTTP:8080 → Pods (sin cifrado interno)
 ```
 
-El equipo de auditoría identifica que el tráfico interno entre el Ingress Controller y los Pods viaja en HTTP plano, lo cual viola la normativa de seguridad PCI-DSS que requiere **cifrado de extremo a extremo**.
+El equipo de seguridad exige cifrado también en el tramo entre el Gateway y los Pods, según el análisis de riesgos y los requisitos aplicables al entorno.
 
 **Para debatir en clase:**
 
-1. ¿Qué patrón de seguridad de red (TLS Passthrough vs. mTLS) implementarías para garantizar que cada Pod tenga su propio certificado TLS y el tráfico entre Ingress y Pods también sea cifrado? ¿Cuáles serían los trade-offs en complejidad y rendimiento?
+1. ¿Qué arquitectura usarías para cifrar el tramo Gateway–backend? Compara TLS hacia el backend con mTLS gestionado por una plataforma de identidad de cargas de trabajo. ¿Qué resuelve y qué no resuelve TLS Passthrough?
 
-2. Si implementas mTLS nativa en Kubernetes (Service Mesh como Istio o Linkerd), ¿qué ventaja adicional obtienes comparado con solo usar certificados auto-firmados en cada Pod?
+2. Si implementas mTLS con un service mesh, ¿qué ventajas operativas ofrece sobre distribuir y rotar manualmente certificados en cada Pod?
 
-3. ¿Cómo balancearías la seguridad (cifrado total) con la observabilidad (poder ver el tráfico en logs del Ingress)?
+3. ¿Qué metadatos de solicitud puede seguir observando el Gateway cuando termina TLS y cómo protegerías los datos sensibles en esos registros?
+
+## Fuentes primarias
+
+- Kubernetes Authors. _Services_. <https://kubernetes.io/docs/concepts/services-networking/service/>
+- Kubernetes Authors. _Ingress_. <https://kubernetes.io/docs/concepts/services-networking/ingress/>
+- Kubernetes SIG Network. _Gateway API_. <https://gateway-api.sigs.k8s.io/>
+- Kubernetes SIG Network. _Ingress NGINX Retirement_. <https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/>

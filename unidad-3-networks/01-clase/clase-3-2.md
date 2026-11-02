@@ -6,7 +6,7 @@ En la sesión anterior analizamos cómo gestionar el tráfico de entrada mediant
 
 A diferencia de la infraestructura tradicional donde las máquinas virtuales se aíslan con VLANs o subredes fijas, Kubernetes utiliza un modelo plano de red (_flat network_) gobernado por tres reglas fundamentales:
 
-1. Todo _pod_ obtiene su propia IP en una red _overlay_ accesible por todo el clúster.
+1. Cada _pod_ recibe una dirección IP única dentro del modelo de red del clúster, alcanzable desde los demás _pods_ según la implementación de red. La red no necesariamente es de tipo _overlay_.
 
 2. Todos los _pods_ pueden comunicarse con cualquier otro _pod_ en el clúster **sin necesidad de NAT** (_Network Address Translation_).
 
@@ -14,9 +14,9 @@ A diferencia de la infraestructura tradicional donde las máquinas virtuales se 
 
 ### 1.1 El motor subyacente: Container Network Interface (CNI)
 
-Kubernetes no gestiona las interfaces de red ni las tablas de ruteo directamente; delega esta función a un _plugin_ de **CNI**:
+Kubernetes integra la configuración de red de los _pods_ con plugins que implementan la especificación **CNI**. El modelo concreto de interfaces, direccionamiento y ruteo depende de la distribución y del plugin:
 
-- **Flannel:** Plugin simple de capa 2 (L2) que crea una red _overlay_ con encapsulamiento VXLAN. Es ligero, pero no soporta _NetworkPolicies_.
+- **Flannel:** Plugin de red que suele crear una red _overlay_ (por ejemplo, con VXLAN). Flannel por sí solo no aplica `NetworkPolicy`; algunas distribuciones lo combinan con otro componente de políticas.
 
 - **Calico:** Plugin de capa 3 (L3) altamente escalable que utiliza BGP (_Border Gateway Protocol_) para ruteo directo o encapsulamiento IP-in-IP/VXLAN. Implementa reglas de seguridad nativas.
 
@@ -32,15 +32,15 @@ Una **`NetworkPolicy`** define reglas de red de capa 3/4 para los _pods_ que sel
 
 - **`Egress`:** Controla qué tráfico saliente se permite desde los _pods_ seleccionados hacia otros _pods_, rangos CIDR o servicios externos.
 
-### 1.3 Descubrimiento de servicios con CoreDNS
+### 1.3 Descubrimiento de servicios con DNS del clúster
 
-Para evitar acoplarse a IPs dinámicas, el clúster integra **CoreDNS**. Cada vez que creas un `Service`, CoreDNS le asigna un nombre de dominio completamente calificado (_FQDN_):
+Para evitar acoplarse a IPs dinámicas, los clústeres Kubernetes suelen configurar un servicio DNS interno, a menudo CoreDNS. El nombre del Service normalmente se puede resolver como nombre corto en el mismo namespace o como nombre de dominio completo (_FQDN_). El dominio de clúster de este ejemplo es el predeterminado habitual `cluster.local`, pero puede configurarse con otro valor:
 
 ```text
 <nombre-servicio>.<namespace>.svc.cluster.local
 ```
 
-Si dos microservicios conviven en el mismo _namespace_, basta con invocar `<nombre-servicio>:<puerto>`.
+Si dos microservicios conviven en el mismo _namespace_, suele bastar con invocar `<nombre-servicio>:<puerto-del-Service>`. El nombre, puerto y comportamiento DNS dependen de la configuración del clúster.
 
 ---
 
@@ -111,8 +111,8 @@ En NetworkPolicies, especificas protocolo + puerto para cada regla:
 |----------|--------|-----------|------------------|
 | **PostgreSQL** | 5432 | TCP | backend pods en namespace: production |
 | **Redis** | 6379 | TCP | app pods, cache services |
-| **DNS (CoreDNS)** | 53 | UDP | todos (sin DNS, descubrimiento falla) |
-| **HTTPS Ingress** | 443 | TCP | Pods del Ingress Controller; el tráfico externo depende de la arquitectura del clúster y del CNI |
+| **DNS del clúster** | 53 | UDP y TCP | Pods que necesitan resolver nombres; destino según la arquitectura DNS del clúster |
+| **HTTPS de entrada** | 443 | TCP | Listener del Gateway/controlador; el camino externo depende de la arquitectura del clúster y del CNI |
 | **Prometheus** | 9090 | TCP | monitoring namespace |
 | **Etcd** | 2379 | TCP | solo control plane (muy restrictivo) |
 
@@ -154,7 +154,7 @@ El efecto visible de un flujo denegado (por ejemplo, timeout o error de conexió
 
 ## 6. Laboratorio
 
-Para completar esta parte, sigue el [Laboratorio de la clase 3.2](../02-laboratorio/laboratorio-clase-3-2.md). Allí encontrarás todos los pasos, código y procedimientos necesarios para verificar el CNI, implementar NetworkPolicies Default Deny, crear whitelists de Ingress y validar comunicación inter-servicios con DNS.
+Para completar esta parte, sigue el [Laboratorio de la clase 3.2](../02-laboratorio/laboratorio-clase-3-2.md). Allí verificarás el soporte de NetworkPolicy del CNI, aislarás el servicio de demostración, permitirás el tráfico desde el proxy de datos de Envoy Gateway y validarás reglas inter-servicios/DNS de forma opcional.
 
 ---
 
@@ -173,3 +173,10 @@ Hoy, un nuevo microservicio `analytics-processor` fue desplegado, pero **no pued
 2. Si la conexión debe ser `analytics-processor` (en `production`) → PostgreSQL (en `data`), escribe la `NetworkPolicy` que permitiría exactamente esa comunicación sin exponer el puerto 5432 a otros servicios.
 
 3. ¿Cómo habrías detectado este problema **antes** de que el analytics-processor fuera desplegado en producción? Propón una estrategia de testing de NetworkPolicies en staging.
+
+## Fuentes primarias
+
+- Kubernetes Authors. _Network Policies_. <https://kubernetes.io/docs/concepts/services-networking/network-policies/>
+- Kubernetes Authors. _Cluster Networking_. <https://kubernetes.io/docs/concepts/cluster-administration/networking/>
+- Kubernetes Authors. _DNS for Services and Pods_. <https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/>
+- Cilium. _Network Policy_. <https://docs.cilium.io/en/stable/security/policy/>

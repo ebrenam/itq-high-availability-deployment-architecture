@@ -1,650 +1,217 @@
-# **Laboratorio 3.3:** Endurecimiento de Seguridad con RBAC y SecurityContext
+# **Laboratorio 3.3:** Endurecimiento con RBAC y Pod Security Admission
 
-Implementar Control de Acceso Basado en Roles (RBAC) y restricciones de seguridad a nivel de Pod para cumplir con estándares de seguridad Kubernetes.
+Aplicar una identidad de aplicación con permisos acotados, endurecer `payment-service` con `SecurityContext` y validar el perfil `Restricted` de Pod Security Admission (PSA).
 
----
+> **Alcance:** El servicio de este laboratorio es el endpoint estático de demostración creado en el Laboratorio 3.1. No necesita consultar el API Server; por eso el token de ServiceAccount se desactiva en el Pod. El Role se usa para aprender y comprobar autorización mediante impersonación con `kubectl auth can-i`, no para habilitar llamadas innecesarias de la aplicación.
 
-## 🎯 Objetivo
+## Requisitos previos
 
-Aplicar principio de mínimo privilegio mediante RBAC y SecurityContext, asegurando que:
-1. payment-service se ejecuta con usuario no-root
-2. El filesystem es read-only
-3. No hay escalación de privilegios
-4. ServiceAccount tiene permisos limitados a recursos específicos
+- Laboratorios 3.1 y 3.2 completados.
+- `payment-service` ejecutándose en `production` y con dos réplicas.
+- Permisos administrativos para crear Roles y RoleBindings, configurar etiquetas de namespace y probar impersonación.
+- El mismo clúster compatible con Envoy Gateway del Laboratorio 3.1 y `kubectl` compatible con el API Server.
 
----
+## Paso 1: Revisar el alcance de Pod Security Admission
 
-## 📋 Requisitos Previos
-
-- **Laboratorio 3.1 y 3.2 completados:** Ingress y NetworkPolicies desplegadas
-- **Kubectl:** v1.28+ (para comandos `auth can-i`)
-- **Namespace:** production (con NetworkPolicies activas)
-- **Clúster:** Soporte para Pod Security Standards (PSS)
-- **Herramientas opcionales:** trivy (para escaneo de vulnerabilidades)
-
----
-
-## 🚀 Punto de Partida
-
-Del Lab 3.2:
-- ✅ payment-service con NetworkPolicies aplicadas
-- ✅ Tráfico asegurado de red (L3/L4)
-- ⏳ Sin restricciones de identidad o proceso (RBAC/SecurityContext)
-
----
-
-## 📝 Pasos del Laboratorio
-
-### Paso 1: Configurar Pod Security Standards (PSS) en el Namespace
-
-Habilitar el perfil `restricted` en el namespace production para forzar SecurityContext mínimo:
-
-#### Linux y macOS
+El modo `enforce` afecta a los Pods nuevos que se creen en el namespace, incluidos los recreados por actualizaciones o reprogramaciones. Comprueba qué workloads existen y confirma que puedes prepararlos todos para `Restricted` antes de activar la exigencia:
 
 ```bash
-# Etiquetar namespace con Pod Security Standard 'restricted'
+kubectl get deployments,statefulsets,daemonsets -n production
+kubectl get pods -n production
+```
+
+En esta secuencia, el Deployment de aplicación creado en el Laboratorio 3.1 es `payment-service`. Si desplegaste otros workloads en `production`, audítalos y endurécelos también antes de activar `enforce`.
+
+Primero activa advertencias y auditoría para detectar incumplimientos sin bloquear Pods:
+
+```bash
+kubectl label namespace production \
+  pod-security.kubernetes.io/warn=restricted \
+  pod-security.kubernetes.io/warn-version=latest \
+  pod-security.kubernetes.io/audit=restricted \
+  pod-security.kubernetes.io/audit-version=latest \
+  --overwrite
+```
+
+En producción, fija la versión del perfil a una versión de Kubernetes probada en lugar de dejar `latest`.
+
+## Paso 2: Crear identidad y permisos RBAC mínimos
+
+La aplicación de demostración no consume la API de Kubernetes. Se crea un permiso acotado a un solo ConfigMap únicamente para inspeccionar RBAC. No se concede acceso a Secrets.
+
+Guarda como `06-rbac-payment-service.yaml`:
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: payment-service-sa
+  namespace: production
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: payment-service-reader
+  namespace: production
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["payment-config"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: payment-service-reader
+  namespace: production
+subjects:
+  - kind: ServiceAccount
+    name: payment-service-sa
+    namespace: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: payment-service-reader
+```
+
+Aplica y verifica la autorización. `--as` requiere que el usuario que ejecuta `kubectl` tenga permiso para impersonar ServiceAccounts:
+
+```bash
+kubectl apply -f 06-rbac-payment-service.yaml
+
+kubectl auth can-i get configmaps/payment-config \
+  --as=system:serviceaccount:production:payment-service-sa -n production
+# Esperado: yes
+
+kubectl auth can-i list configmaps \
+  --as=system:serviceaccount:production:payment-service-sa -n production
+# Esperado: no
+
+kubectl auth can-i get secrets \
+  --as=system:serviceaccount:production:payment-service-sa -n production
+# Esperado: no
+
+kubectl auth can-i delete pods \
+  --as=system:serviceaccount:production:payment-service-sa -n production
+# Esperado: no
+```
+
+## Paso 3: Endurecer el Pod sin eliminar el Deployment
+
+No elimines el Deployment: una actualización de su Pod template inicia un RollingUpdate y conserva el Service. Guarda el siguiente parche como `07-payment-security-patch.yaml`:
+
+```yaml
+spec:
+  template:
+    spec:
+      serviceAccountName: payment-service-sa
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: payment-service
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+```
+
+Aplica el parche estratégico y espera el rollout:
+
+```bash
+kubectl patch deployment payment-service -n production \
+  --type=strategic \
+  --patch-file=07-payment-security-patch.yaml
+
+kubectl rollout status deployment/payment-service -n production --timeout=120s
+kubectl get pods -n production -l app=payment-service
+```
+
+El puerto de escucha es `8080`, por lo que `NET_BIND_SERVICE` no es necesario. `readOnlyRootFilesystem` es una medida de endurecimiento adicional; no es un requisito de PSS `Restricted`.
+
+Comprueba que PSA en modo `warn` no notificó incumplimientos para el Pod nuevo. La imagen `hashicorp/http-echo` es distroless y no incluye shell ni utilidades como `id` o `touch`; valida la configuración efectiva del Pod con `jsonpath`:
+
+```bash
+kubectl get pods -n production -l app=payment-service \
+  -o jsonpath='{range .items[*]}{.metadata.name}{" runAsNonRoot="}{.spec.securityContext.runAsNonRoot}{" runAsUser="}{.spec.securityContext.runAsUser}{" readOnlyRootFilesystem="}{.spec.containers[0].securityContext.readOnlyRootFilesystem}{"\n"}{end}'
+```
+
+Esperado: cada Pod muestra `runAsNonRoot=true`, `runAsUser=1000` y `readOnlyRootFilesystem=true`. La imagen no permite comprobar una escritura interactiva con `touch`; el endpoint HTTPS del final valida que la aplicación sigue respondiendo con estas restricciones.
+
+## Paso 4: Aplicar `enforce=restricted`
+
+Activa `enforce` solo cuando todos los workloads del namespace estén preparados. La etiqueta de versión `latest` facilita el ejercicio; para entornos estables fija el minor version apropiado:
+
+```bash
 kubectl label namespace production \
   pod-security.kubernetes.io/enforce=restricted \
   pod-security.kubernetes.io/enforce-version=latest \
   --overwrite
 
-# Verificar que se aplicó
-kubectl describe namespace production | grep pod-security
+kubectl get namespace production --show-labels
+kubectl rollout status deployment/payment-service -n production
 ```
 
-#### Windows
+PSA evalúa los Pods al admitirlos; no reescribe ni remedia Pods ya existentes. Si una nueva revisión no cumple, el API Server la rechazará y el Deployment no progresará.
 
-```powershell
-kubectl label namespace production `
-  pod-security.kubernetes.io/enforce=restricted `
-  pod-security.kubernetes.io/enforce-version=latest `
-  --overwrite
-
-kubectl describe namespace production | Select-String "pod-security"
-```
-
-**Esperado:** Etiquetas `pod-security.kubernetes.io/enforce=restricted` aplicadas.
-
----
-
-### Paso 2: Crear ServiceAccount de Mínimo Privilegio
-
-Crea el archivo `06-rbac-payment-service.yaml`:
-
-```yaml
----
-# ServiceAccount para payment-service (identidad)
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: payment-service-sa
-  namespace: production
-  labels:
-    app: payment-service
-
----
-# Role: Permisos mínimos (solo leer ConfigMaps)
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: payment-service-role
-  namespace: production
-rules:
-# Permite leer ConfigMaps (para configuración)
-- apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["get", "list", "watch"]
-# Permite leer Secrets (para credenciales)
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["get"]
-
----
-# RoleBinding: Vincula el ServiceAccount con el Role
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: payment-service-binding
-  namespace: production
-subjects:
-- kind: ServiceAccount
-  name: payment-service-sa
-  namespace: production
-roleRef:
-  kind: Role
-  name: payment-service-role
-  apiGroup: rbac.authorization.k8s.io
-```
-
-Aplica el manifiesto:
+## Paso 5: Verificar servicio y controles
 
 ```bash
-# Linux, macOS y Windows
-kubectl apply -f 06-rbac-payment-service.yaml
+kubectl get pods,svc -n production
+kubectl get role,rolebinding,serviceaccount -n production
+kubectl auth can-i get configmaps/payment-config \
+  --as=system:serviceaccount:production:payment-service-sa -n production
+kubectl auth can-i get secrets \
+  --as=system:serviceaccount:production:payment-service-sa -n production
 ```
 
-Verifica:
+Si el endpoint sigue respondiendo tras el cambio, el Service y la estrategia de actualización continúan operativos:
 
 ```bash
-# Ver ServiceAccount
-kubectl get sa -n production
-kubectl describe sa payment-service-sa -n production
-
-# Ver Role
-kubectl get role -n production
-kubectl describe role payment-service-role -n production
-
-# Ver RoleBinding
-kubectl get rolebinding -n production
-kubectl describe rolebinding payment-service-binding -n production
+kubectl port-forward -n envoy-gateway-system \
+  service/"$(kubectl get svc -n envoy-gateway-system \
+    -l gateway.envoyproxy.io/owning-gateway-namespace=production,gateway.envoyproxy.io/owning-gateway-name=checkout-gateway \
+    -o jsonpath='{.items[0].metadata.name}')" 8443:443
 ```
 
-**Esperado:**
-- ServiceAccount `payment-service-sa` creada
-- Role `payment-service-role` con permisos sobre configmaps y secrets
-- RoleBinding conectando SA → Role
-
----
-
-### Paso 3: Actualizar Deployment con SecurityContext
-
-Crea el archivo `07-payment-hardened.yaml`:
-
-```yaml
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: payment-service
-  namespace: production
-  labels:
-    app: payment-service
-    version: v1.0.0
-spec:
-  replicas: 2
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
-  selector:
-    matchLabels:
-      app: payment-service
-  template:
-    metadata:
-      labels:
-        app: payment-service
-        version: v1.0.0
-    spec:
-      # Usar ServiceAccount de mínimo privilegio
-      serviceAccountName: payment-service-sa
-      automountServiceAccountToken: true
-      
-      # SecurityContext a nivel de Pod
-      securityContext:
-        runAsNonRoot: true          # Debe ejecutarse como usuario no-root
-        runAsUser: 1000             # UID 1000 (usuario 'appuser')
-        runAsGroup: 1000            # GID 1000
-        fsGroup: 1000               # Grupo propietario de volúmenes
-        seccompProfile:
-          type: RuntimeDefault      # Usar perfil seccomp default
-      
-      containers:
-      - name: payment-service
-        image: <tu-usuario-dockerhub>/payment-service:1.0.0
-        imagePullPolicy: Always
-        
-        ports:
-        - containerPort: 8080
-          name: http
-        
-        # SecurityContext a nivel de Contenedor
-        securityContext:
-          allowPrivilegeEscalation: false    # No permitir escalación de privilegios
-          readOnlyRootFilesystem: true       # Filesystem raíz read-only
-          capabilities:
-            drop:                            # Eliminar todas las capabilities
-            - ALL
-            add:                             # Agregar solo lo necesario
-            - NET_BIND_SERVICE               # (solo si es necesario)
-        
-        # Volumen temporal para escritura
-        volumeMounts:
-        - name: tmp
-          mountPath: /tmp
-        - name: cache
-          mountPath: /home/appuser/.cache
-        
-        livenessProbe:
-          httpGet:
-            path: /q/health/live
-            port: 8080
-          initialDelaySeconds: 10
-          periodSeconds: 10
-        
-        readinessProbe:
-          httpGet:
-            path: /q/health/ready
-            port: 8080
-          initialDelaySeconds: 10
-          periodSeconds: 10
-        
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-      
-      # Volúmenes temporales (emptyDir para /tmp)
-      volumes:
-      - name: tmp
-        emptyDir: {}
-      - name: cache
-        emptyDir: {}
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: payment-service
-  namespace: production
-  labels:
-    app: payment-service
-spec:
-  type: ClusterIP
-  ports:
-  - port: 80
-    targetPort: 8080
-    name: http
-  selector:
-    app: payment-service
-```
-
-Aplica el deployment endurecido:
+En otra terminal, desde el directorio donde está `checkout.crt`:
 
 ```bash
-# Eliminar deployment antiguo
-kubectl delete deployment payment-service -n production
-
-# Aplicar nuevo deployment con SecurityContext
-kubectl apply -f 07-payment-hardened.yaml
+curl --cacert checkout.crt \
+  --resolve checkout.local:8443:127.0.0.1 \
+  https://checkout.local:8443/v1/payment
 ```
 
-Verifica:
+## Troubleshooting
 
-```bash
-# Ver pods
-kubectl get pods -n production -l app=payment-service
+- **El Pod es rechazado por `enforce`:** revisa el mensaje de admisión y los requisitos Restricted en Pod Security Standards. Verifica no-root, `allowPrivilegeEscalation: false`, `seccompProfile` permitido y `capabilities.drop: ["ALL"]`; confirma también que no se use un volumen prohibido.
+- **El Deployment no completa el rollout:** usa `kubectl describe deployment` y `kubectl describe pod` para distinguir rechazo de PSA, error de imagen o fallo de readiness. No borres el Deployment como solución.
+- **`kubectl auth can-i` falla aunque el RoleBinding exista:** confirma el namespace y el nombre exacto de la ServiceAccount; además, el usuario operador puede necesitar permiso para impersonar (`--as`).
+- **La app no necesita hablar con el API Server:** conserva `automountServiceAccountToken: false` y no agregues permisos RBAC a la aplicación. Si un requerimiento real cambia, concede solo los recursos y verbos estrictamente necesarios.
 
-# Describir pod para ver SecurityContext
-kubectl describe pod -n production deployment/payment-service | grep -A 20 "Security Context"
+## Evidencia y reflexión
 
-# Ver que los pods están Running
-kubectl get pods -n production
-```
+Documenta el estado del Deployment, el Pod `Running`, los valores efectivos de seguridad, el resultado del rollout y las verificaciones `can-i`.
 
-**Esperado:**
-- Pods en estado `Running`
-- SecurityContext con `runAsNonRoot: true`
-- `readOnlyRootFilesystem: true`
+1. ¿Qué diferencia hay entre `runAsNonRoot` y `readOnlyRootFilesystem`?
+2. ¿Por qué una ServiceAccount no necesita un Role si la aplicación no consulta el API Server?
+3. ¿Por qué `pods/exec` se modela como subrecurso en RBAC y no como verbo `exec`?
+4. ¿Qué diferencia existe entre los modos PSA `warn`, `audit` y `enforce`?
 
----
+## Continuidad
 
-### Paso 4: Validar Permisos RBAC con `kubectl auth can-i`
+Al completar este laboratorio se han practicado entrada HTTPS (3.1), aislamiento L3/L4 (3.2) y autorización/admisión/endurecimiento de Pods (3.3). Estos controles son capas distintas; ninguno sustituye por sí solo a los demás.
 
-Probar qué acciones el ServiceAccount puede/no puede realizar:
+## Fuentes primarias
 
-```bash
-# Acciones PERMITIDAS
-# ==================
-
-# Ver ConfigMaps (permitido)
-kubectl auth can-i list configmaps \
-  --as=system:serviceaccount:production:payment-service-sa \
-  -n production
-# Resultado esperado: yes
-
-# Obtener un ConfigMap (permitido)
-kubectl auth can-i get configmaps \
-  --as=system:serviceaccount:production:payment-service-sa \
-  -n production
-# Resultado esperado: yes
-
-# Acciones DENEGADAS
-# ==================
-
-# Eliminar Pods (denegado)
-kubectl auth can-i delete pods \
-  --as=system:serviceaccount:production:payment-service-sa \
-  -n production
-# Resultado esperado: no
-
-# Crear Deployments (denegado)
-kubectl auth can-i create deployments \
-  --as=system:serviceaccount:production:payment-service-sa \
-  -n production
-# Resultado esperado: no
-
-# Actualizar Secrets (denegado)
-kubectl auth can-i update secrets \
-  --as=system:serviceaccount:production:payment-service-sa \
-  -n production
-# Resultado esperado: no
-
-# Acceso de cluster-admin
-# ========================
-
-# Ver que otro ServiceAccount (default) NO tiene permisos
-kubectl auth can-i delete pods \
-  --as=system:serviceaccount:production:default \
-  -n production
-# Resultado esperado: no
-```
-
-**Esperado:**
-- `list/get configmaps` → yes (permitido)
-- `delete pods` → no (denegado)
-- `create deployments` → no (denegado)
-
----
-
-### Paso 5: Probar SecurityContext no-root
-
-Verificar que el contenedor se ejecuta como usuario no-root:
-
-```bash
-# Ejecutar comandos dentro del Pod
-kubectl exec -it -n production deployment/payment-service -- id
-
-# Resultado esperado:
-# uid=1000 gid=1000 groups=1000
-# (NO uid=0 que sería root)
-
-# Intentar escribir en filesystem raíz (debe fallar)
-kubectl exec -it -n production deployment/payment-service -- touch /test.txt
-
-# Resultado esperado:
-# Read-only file system (error)
-
-# Pero puede escribir en /tmp (permitido)
-kubectl exec -it -n production deployment/payment-service -- touch /tmp/test.txt
-
-# Resultado esperado: Success
-```
-
-**Validación esperada:**
-- UID != 0 (no es root)
-- No puede escribir en / (read-only)
-- Puede escribir en /tmp (emptyDir permitido)
-
----
-
-### Paso 6: Crear ServiceAccounts para Otros Servicios
-
-Aplicar el mismo patrón a catalog-service e inventory-service:
-
-Crea el archivo `08-rbac-all-services.yaml`:
-
-```yaml
----
-# CATALOG SERVICE
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: catalog-service-sa
-  namespace: production
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: catalog-service-role
-  namespace: production
-rules:
-- apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["get", "list"]
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: catalog-service-binding
-  namespace: production
-subjects:
-- kind: ServiceAccount
-  name: catalog-service-sa
-  namespace: production
-roleRef:
-  kind: Role
-  name: catalog-service-role
-  apiGroup: rbac.authorization.k8s.io
-
----
-# INVENTORY SERVICE
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: inventory-service-sa
-  namespace: production
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: inventory-service-role
-  namespace: production
-rules:
-- apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["get", "list"]
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: inventory-service-binding
-  namespace: production
-subjects:
-- kind: ServiceAccount
-  name: inventory-service-sa
-  namespace: production
-roleRef:
-  kind: Role
-  name: inventory-service-role
-  apiGroup: rbac.authorization.k8s.io
-```
-
-Aplica:
-
-```bash
-kubectl apply -f 08-rbac-all-services.yaml
-```
-
----
-
-### Paso 7: Escaneo de Vulnerabilidades (Opcional pero Recomendado)
-
-Usar Trivy para escanear imágenes antes de desplegar:
-
-```bash
-# Instalar trivy (si no está instalado)
-# macOS
-brew install aquasecurity/trivy/trivy
-
-# Linux
-wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add -
-echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/trivy.list
-apt-get update && apt-get install trivy
-
-# Escanear imagen
-trivy image <tu-usuario-dockerhub>/payment-service:1.0.0
-
-# Salir con error si hay críticas
-trivy image --exit-code 1 --severity CRITICAL <tu-usuario-dockerhub>/payment-service:1.0.0
-```
-
-**Esperado:** Reporte de vulnerabilidades encontradas (o ninguna si está bien endurecida).
-
----
-
-## 🔍 Guía de Troubleshooting
-
-### Problema 1: Pod rechazado por PSS (Restricted)
-
-**Síntomas:**
-```
-Error creating pod: violates PodSecurityPolicy
-```
-
-**Causa:** Pod no cumple con restricciones del estándar Restricted
-
-**Solución:** Asegurar que el Pod tiene:
-```yaml
-securityContext:
-  runAsNonRoot: true
-  readOnlyRootFilesystem: true
-  capabilities:
-    drop:
-    - ALL
-```
-
----
-
-### Problema 2: Pod no puede escribir en /tmp
-
-**Síntomas:**
-```
-Permission denied: /tmp/file.txt
-```
-
-**Causa:** Falta emptyDir montado en /tmp
-
-**Solución:** Agregar volumen:
-```yaml
-volumes:
-- name: tmp
-  emptyDir: {}
-
-volumeMounts:
-- name: tmp
-  mountPath: /tmp
-```
-
----
-
-### Problema 3: ServiceAccount no tiene permisos necesarios
-
-**Síntomas:** Aplicación falla con error de permisos
-
-**Solución:** Verificar con `kubectl auth can-i` y expandir Role si es necesario:
-
-```bash
-# Ver qué se necesita
-kubectl auth can-i <action> <resource> \
-  --as=system:serviceaccount:production:payment-service-sa \
-  -n production
-```
-
----
-
-## 📊 Evidencia / Validación
-
-Documentar:
-
-### 1. Pod Security Standard Aplicado
-```bash
-kubectl describe namespace production | grep pod-security
-```
-
-### 2. ServiceAccount Creada
-```bash
-kubectl get sa -n production
-kubectl describe sa payment-service-sa -n production
-```
-
-### 3. RBAC Aplicado
-```bash
-kubectl get role,rolebinding -n production
-```
-
-### 4. SecurityContext Activo
-```bash
-kubectl describe pod -n production deployment/payment-service | grep -A 15 "Security Context"
-```
-
-### 5. Verificación de No-Root
-```bash
-kubectl exec -n production deployment/payment-service -- id
-# Esperado: uid=1000 (no 0)
-```
-
-### 6. Filesystem Read-Only Verificado
-```bash
-kubectl exec -n production deployment/payment-service -- touch /test.txt
-# Esperado: Read-only file system (error)
-
-kubectl exec -n production deployment/payment-service -- touch /tmp/test.txt
-# Esperado: Success
-```
-
-### 7. Permisos RBAC Validados
-```bash
-kubectl auth can-i list configmaps \
-  --as=system:serviceaccount:production:payment-service-sa \
-  -n production
-# Esperado: yes
-
-kubectl auth can-i delete pods \
-  --as=system:serviceaccount:production:payment-service-sa \
-  -n production
-# Esperado: no
-```
-
----
-
-## 🎓 Reflexión Final
-
-**Preguntas de consolidación:**
-
-1. ¿Cuál es la diferencia entre `runAsNonRoot` y `readOnlyRootFilesystem`?
-   - Respuesta: runAsNonRoot fuerza a no ser root (identidad), readOnlyRootFilesystem protege archivos de sistema (permisos).
-
-2. ¿Por qué es importante capabiltiies `drop: ALL`?
-   - Respuesta: Elimina funciones peligrosas (ej: ptrace, SYS_ADMIN) que podrían permitir escalación de privilegios.
-
-3. ¿Cómo verifica Kubernetes que un Pod cumple con Pod Security Standard Restricted?
-   - Respuesta: El admission controller verifica en tiempo de creación que el Pod tiene SecurityContext requerido.
-
----
-
-## 🔗 Continuidad
-
-**Después del Lab 3.3:**
-- ✅ Ingress + TLS seguro (Lab 3.1)
-- ✅ NetworkPolicies bloqueando tráfico no autorizado (Lab 3.2)
-- ✅ RBAC + SecurityContext limitando privilegios (Lab 3.3)
-- ✅ **Unidad 3 completa: Arquitectura cloud-native segura**
-
-**Próxima unidad (U4):**
-- Automatización con CI/CD
-- Pipelines de build y deploy
-- GitOps en Kubernetes
-
----
-
-## 📚 Recursos Adicionales
-
-- [Kubernetes SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)
-- [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
-- [RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)
-- [Trivy Vulnerability Scanner](https://aquasecurity.github.io/trivy/)
-- [OWASP Kubernetes Top 10](https://owasp.org/www-community/vulnerabilities/Kubernetes_Top_10)
-
----
-
-**Laboratorio 3.3 - Versión:** 1.0  
-**Última actualización:** 2026-10-15  
-**Estado:** ✅ Listo para docencia
+- Kubernetes Authors. _Pod Security Standards_. <https://kubernetes.io/docs/concepts/security/pod-security-standards/>
+- Kubernetes Authors. _Pod Security Admission_. <https://kubernetes.io/docs/concepts/security/pod-security-admission/>
+- Kubernetes Authors. _Security Context_. <https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>
+- Kubernetes Authors. _RBAC Authorization_. <https://kubernetes.io/docs/reference/access-authn-authz/rbac/>
+- Kubernetes Authors. _RBAC good practices_. <https://kubernetes.io/docs/concepts/security/rbac-good-practices/>
+- Kubernetes Authors. _Service Accounts_. <https://kubernetes.io/docs/concepts/security/service-accounts/>
