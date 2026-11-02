@@ -1,4 +1,4 @@
-# 1.1 Fundamentos de Disponibilidad y Confiabilidad
+# 1.1 Fundamentos de disponibilidad y confiabilidad
 
 Iniciamos la unidad estableciendo los cimientos teóricos y cuantitativos para entender por qué los sistemas fallan y cómo medimos su capacidad de mantenerse a flote antes de diseñar arquitecturas distribuidas.
 

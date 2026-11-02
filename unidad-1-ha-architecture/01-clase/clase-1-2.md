@@ -1,4 +1,4 @@
-# 1.2 Patrones de Diseño para la Resiliencia y la Distribución
+# 1.2 Patrones de diseño para la resiliencia y la distribución
 
 En la sesión anterior analizamos cómo cuantificar la confiabilidad mediante métricas como SLI y SLO e identificar los puntos únicos de fallo, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar patrones de diseño como _circuit breaker_, _bulkhead_ y _rate limiting_ para aislar y tolerar fallas de forma arquitectónica.
 

@@ -1,4 +1,4 @@
-# 1.3 Despliegue en la Nube y Zonas de Disponibilidad
+# 1.3 Despliegue en la nube y zonas de disponibilidad
 
 En la sesión anterior analizamos cómo implementar patrones de resiliencia como _circuit breaker_ y _bulkhead_ a nivel de aplicación, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar la infraestructura _multi-AZ_ y arquitecturas tolerantes a fallos en la nube.
 
