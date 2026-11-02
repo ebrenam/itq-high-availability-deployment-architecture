@@ -38,7 +38,7 @@ public class CatalogResource {
      * en todos los reintentos, garantizando un patrón predecible de fallos.
      */
     private static final ThreadLocal<Boolean> SHOULD_FAIL_FIRST_ATTEMPTS = ThreadLocal.withInitial(() -> false);
-
+    
     /**
      * Endpoint principal que retorna el catálogo de productos.
      * 
@@ -99,7 +99,7 @@ public class CatalogResource {
             ATTEMPT_COUNT.set(0);  // Resetear inmediatamente para siguiente solicitud HTTP
             SHOULD_FAIL_FIRST_ATTEMPTS.set(false);
             return Response.ok("{\"status\":\"SUCCESS\",\"data\":[\"Product A\",\"Product B\",\"Product C\"]}").build();
-
+            
         } finally {
             // No resetear aquí: si la solicitud falla, getCatalogFallback() leerá el contador
             // antes de resetearlo. Si tuvo éxito, ya se reseteó antes del return.
