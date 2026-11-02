@@ -1,4 +1,4 @@
-# 3.2 Redes del Clúster y Políticas de Comunicación
+# 3.2 Redes del clúster y políticas de comunicación
 
 En la sesión anterior analizamos cómo gestionar el tráfico de entrada mediante _Services_, _Ingress_ y terminación TLS, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar _NetworkPolicies_, el CNI y el aislamiento del tráfico interno.
 
@@ -64,7 +64,7 @@ Imagina un gran edificio corporativo _open space_ sin paredes físicas interiore
 
 ---
 
-## 3. Modelos de Aislamiento: Default Deny vs Allow-List
+## 3. Modelos de aislamiento
 
 La práctica profesional de seguridad en Kubernetes sigue el modelo **Allow-List** (lista blanca):
 
@@ -74,24 +74,17 @@ La práctica profesional de seguridad en Kubernetes sigue el modelo **Allow-List
 | **Default Deny** | Bloquea TODO, permite solo lo explícito | ✅ Alta | Media |
 | **Zero Trust** | Default Deny + autenticación/autorización mutua | ✅✅ Máxima | Alta |
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Kubernetes Network (Default: Todos pueden hablar)       │
-├─────────────────────────────────────────────────────────┤
-│                                                           │
-│  ┌──────────────────┐           ┌──────────────────┐   │
-│  │ web-pod          │   ═════→  │ db-pod           │   │ ✅ Permitido
-│  │ (label: frontend)│           │ (label: backend) │   │
-│  └──────────────────┘           └──────────────────┘   │
-│                                                           │
-│  ┌──────────────────┐           ┌──────────────────┐   │
-│  │ hacker-pod       │   ─X─→    │ db-pod           │   │ ❌ Bloqueado
-│  │ (label: untrusted)│           │ (label: backend) │   │
-│  └──────────────────┘           └──────────────────┘   │
-│                                                           │
-│ (Solo si aplicamos una NetworkPolicy)                    │
-└─────────────────────────────────────────────────────────┘
-```
+- **Default Allow**
+
+![allow](images/image-07.jpg)
+
+- **Default Deny**
+
+![deny](images/image-08.jpg)
+
+- **Zero Trust**
+
+![zero-trust](images/image-09.jpg)
 
 **Flujo típico con NetworkPolicy:**
 
@@ -138,7 +131,7 @@ spec:
 
 ---
 
-## 5. Integración con Observabilidad
+## 5. Integración con observabilidad
 
 Cuando deniegas tráfico, ¿cómo lo vemos?
 

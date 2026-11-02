@@ -1,4 +1,4 @@
-# 3.1 Balanceo de Carga y Acceso Externo
+# 3.1 Balanceo de carga y acceso externo
 
 En la sesión anterior analizamos cómo externalizar configuraciones y escalar réplicas dinámicamente con _ConfigMaps_, _Secrets_ y _HPA_, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar _Services_, _Ingress_ y _Load Balancers_ para exponer nuestro clúster.
 
@@ -8,21 +8,9 @@ En Kubernetes, los _pods_ son efímeros. Tienen direcciones IP dinámicas que ca
 
 Para resolver este problema de direccionamiento inestable, Kubernetes abstrae la capa de red mediante dos primitivas fundamentales: los **Services** y los controladores de **Ingress**.
 
-```text
-[ Cliente Externo ]
-        │
-        ▼
-[ Ingress Controller ] (L7: Rutas, SSL/TLS, Dominios)
-        │
-        ▼
-[ Kubernetes Service ] (L4: IP estable interna + Selector)
-        │
-   ┌────┴────┐
-   ▼         ▼
-[ Pod 1 ] [ Pod 2 ]  (L3: IPs dinámicas en la red overlay)
-```
+![ingress](images/image-01.jpg)
 
-### 1.1 La capa de red de capa 4: Kubernetes services
+### 1.1 La capa de red de capa 4: Kubernetes Services
 
 Un _Service_ es una abstracción que define un conjunto lógico de _pods_ y una política para acceder a ellos mediante etiquetas (_labels_). Funciona como un balanceador de carga interno de capa 4 (TCP/UDP) con una IP virtual fija (_ClusterIP_).
 
@@ -70,40 +58,12 @@ Imagina un gran edificio corporativo de oficinas:
 
 ---
 
-## 3. Arquitectura Completa: Flujo de Tráfico
+## 3. Arquitectura completa: Flujo de tráfico
 
-```text
-                    INTERNET (HTTPS:443)
-                            │
-                            │ checkout.local
-                            ▼
-              ┌──────────────────────────────┐
-              │ NGINX Ingress Controller      │
-              │ - TLS Termination             │
-              │ - Host-based routing          │
-              │ - Path-based routing          │
-              └───────────┬────────────────────┘
-                          │
-               ┌──────────┼──────────┐
-               │                     │
-               ▼ HTTP:8080           ▼ HTTP:8080
-          ┌─────────────┐       ┌──────────────┐
-          │   Service   │       │   Service    │
-          │  payment    │       │  catalog     │
-          │(ClusterIP)  │       │ (ClusterIP)  │
-          └──────┬──────┘       └──────┬───────┘
-                 │                     │
-             ┌───┴───┐            ┌───┴────┐
-             ▼       ▼            ▼        ▼
-           ┌───┐  ┌───┐       ┌────┐   ┌────┐
-           │ P1│  │ P2│       │ P3 │   │ P4 │
-           └───┘  └───┘       └────┘   └────┘
-        (IPs dinámicas cambian constantemente)
-```
-
+![traffic](images/image-02.jpg)
 ---
 
-## 4. Caso de Uso Real: Plataforma E-commerce
+## 4. Caso de uso real: Plataforma E-commerce
 
 Imagina una plataforma de e-commerce con 3 microservicios:
 
@@ -115,16 +75,7 @@ Imagina una plataforma de e-commerce con 3 microservicios:
 
 Con **un solo Ingress Controller**, exponemos payment-service con TLS, mientras catalog e inventory permanecen privadas (solo accesibles internamente).
 
-```
-Cliente navegando checkout.local (HTTPS):
-    │
-    └──→ Ingress Controller (NGINX)
-            │
-            └──→ payment-service (Pod 1/2)
-                    │
-                    ├──→ catalog-service (privado)
-                    └──→ inventory-service (privado)
-```
+![traffic](images/image-03.jpg)
 
 Sin Ingress, necesitaríamos:
 - ❌ 3 LoadBalancers externos (costoso)
@@ -140,32 +91,19 @@ Con Ingress:
 
 ---
 
-## 5. Comparación: Alternativas Históricas
+## 5. Comparación: Alternativas históricas
 
-### Infraestructura Tradicional (Pre-Kubernetes)
-```
-Monolítico
-└─ 1 aplicación = 1 servidor = 1 IP pública = 1 DNS
-   Escalado manual, sin service discovery
-```
+### Infraestructura tradicional (Pre-Kubernetes)
 
-### Kubernetes Sin Ingress (Solo ClusterIP + NodePort)
-```
-Múltiples servicios, pero sin unificación:
-└─ Cada NodePort = puerto diferente (30000, 30001, 30002...)
-└─ Cliente debe saber puertos específicos
-└─ Sin gestión centralizada de TLS
-└─ Sin enrutamiento sofisticado
-```
+![mono](images/image-04.jpg)
 
-### Kubernetes + Ingress (Mejor Práctica Moderna)
-```
-Múltiples servicios, acceso unificado:
-└─ UN Ingress Controller = múltiples dominios/rutas
-└─ Gestión centralizada de TLS
-└─ Cliente ve nombres amigables (checkout.local)
-└─ Escala transparentemente sin cambiar cliente
-```
+### Kubernetes sin Ingress (solo ClusterIP + NodePort)
+
+![no-ingres](images/image-05.jpg)
+
+### Kubernetes + Ingress (mejor práctica moderna)
+
+![ingress](images/image-06.jpg)
 
 ---
 
@@ -181,7 +119,7 @@ Para completar esta parte, sigue el [Laboratorio de la clase 3.1](../02-laborato
 
 Tu empresa tiene una arquitectura con 5 microservicios desplegados en Kubernetes. Actualmente todos están expuestos a través de un único Ingress Controller NGINX usando terminación TLS en el borde:
 
-```
+```text
 Cliente → HTTPS:443 → Ingress Controller → HTTP:8080 → Pods (sin cifrado interno)
 ```
 
