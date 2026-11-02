@@ -20,13 +20,13 @@ Kubernetes no gestiona las interfaces de red ni las tablas de ruteo directamente
 
 - **Calico:** Plugin de capa 3 (L3) altamente escalable que utiliza BGP (_Border Gateway Protocol_) para ruteo directo o encapsulamiento IP-in-IP/VXLAN. Implementa reglas de seguridad nativas.
 
-- **Cilium:** Plugin de última generación respaldado por **eBPF** (_Extended Berkeley Packet Filter_). Procesa paquetes directamente en el Kernel de Linux, evitando la sobrecarga de _iptables_ y ofreciendo observabilidad y seguridad en capa 7 (L7).
+- **Cilium:** Plugin de red que usa **eBPF** (_Extended Berkeley Packet Filter_) para procesar y aplicar políticas de red en el kernel de Linux. Puede ofrecer controles L7 y observabilidad de flujos cuando esas funciones están configuradas; no autentica por sí solo la identidad de las cargas de trabajo.
 
-### 1.2 Seguridad con modelo Zero Trust: NetworkPolicies
+### 1.2 Aislamiento de red con NetworkPolicies
 
-Por defecto, la red de Kubernetes es **plana y totalmente abierta**: cualquier _pod_ en cualquier _namespace_ puede hablar con cualquier otro _pod_. Para implementar el principio de mínimo privilegio (_Zero Trust_), declaramos objetos **`NetworkPolicy`**.
+Si no hay una política aplicable, los _pods_ no están aislados para esa dirección de tráfico y se permite la comunicación. Este comportamiento no significa que todos los _pods_ estén expuestos a Internet: el acceso externo también depende de cómo se expongan los servicios y de la red del clúster.
 
-Una `NetworkPolicy` actúa como un _firewall_ distribuido basado en etiquetas (_labels_) y _namespaces_:
+Una **`NetworkPolicy`** define reglas de red de capa 3/4 para los _pods_ que selecciona mediante etiquetas (_labels_). Puede contribuir al principio de mínimo privilegio, pero por sí sola no implementa Zero Trust, no autentica identidades y no crea una ruta de acceso externo:
 
 - **`Ingress`:** Controla qué tráfico entrante se permite hacia los _pods_ seleccionados.
 
@@ -56,42 +56,50 @@ Imagina un gran edificio corporativo _open space_ sin paredes físicas interiore
 
     - _Calico_ es poner torniquetes con tarjetas magnéticas en cada pasillo.
 
-    - _Cilium_ es colocar escáneres de reconocimiento facial con rayos X (eBPF) instalados directamente en las puertas; detectan si alguien lleva algo no autorizado sin detener el flujo de personas.
+    - _Cilium_ es instalar controles de tráfico programables en los accesos del edificio; con las funciones correspondientes configuradas, también permite observar los flujos.
 
-- **NetworkPolicies (Tarjetas de acceso VIP):** Por defecto, el becario de marketing puede entrar al cuarto del servidor de la nómina de la empresa. Al aplicar una `NetworkPolicy`, colocas un lector biométrico: solo los empleados etiquetados como `role: finance` pueden traspasar la puerta del cuarto `namespace: accounting`.
+- **NetworkPolicies (Reglas de acceso por etiquetas):** Una `NetworkPolicy` se parece a una lista de permisos que deja pasar a ciertos grupos según etiquetas del sistema, no a un lector biométrico que comprueba la identidad de una persona. Por ejemplo, puede permitir tráfico hacia los _pods_ seleccionados de `accounting` desde _pods_ de un _namespace_ etiquetado como `role: finance`.
 
 - **CoreDNS (El directorio telefónico interno):** Nadie en la empresa se memoriza las extensiones de 10 dígitos de sus compañeros. Abres la libreta y buscas "Servicio de Inventario", e internamente el directorio te enlaza con la extensión actual de la persona, cambie de escritorio o no.
 
 ---
 
-## 3. Modelos de aislamiento
+## 3. Aislamiento de red y Zero Trust
 
-La práctica profesional de seguridad en Kubernetes sigue el modelo **Allow-List** (lista blanca):
+`Default Allow` y `Default Deny` describen el aislamiento de red de los _pods_ para una dirección concreta. No son modos globales del clúster: las políticas seleccionan _pods_ y pueden aislarlos para `Ingress`, `Egress` o ambos.
 
-| Modelo | Estrategia | Seguridad | Complejidad |
-|--------|-----------|----------|-------------|
-| **Default Allow** | Bloquea solo lo conocido como peligroso | ⚠️ Baja (hay muchas cosas desconocidas) | Baja |
-| **Default Deny** | Bloquea TODO, permite solo lo explícito | ✅ Alta | Media |
-| **Zero Trust** | Default Deny + autenticación/autorización mutua | ✅✅ Máxima | Alta |
+### 3.1 Default Allow: sin aislamiento para esa dirección
 
-- **Default Allow**
+Si ninguna `NetworkPolicy` selecciona un _pod_ para `Ingress` (entrada) o `Egress` (salida), se permite el tráfico en esa dirección. No significa que una política bloquee automáticamente el tráfico considerado peligroso ni que el _pod_ quede publicado hacia Internet.
 
-![allow](images/image-07.jpg)
+```mermaid
+flowchart LR
+    A[Pod cliente A] -->|Sin política de aislamiento| DB[Pod de base de datos]
+    B[Pod cliente B] -->|Sin política de aislamiento| DB
+```
 
-- **Default Deny**
+### 3.2 Default Deny: aislar _pods_ seleccionados y permitir explícitamente
 
-![deny](images/image-08.jpg)
+Se configura, por ejemplo, con una política de `Ingress` que selecciona los _pods_ de la base de datos y no define reglas de entrada: esos _pods_ quedan aislados para el tráfico entrante. Luego, otras políticas pueden permitir los flujos necesarios. Las reglas de las políticas aplicables se combinan de forma aditiva; los _pods_ no seleccionados por ellas no cambian su comportamiento.
 
-- **Zero Trust**
+```mermaid
+flowchart LR
+    A[Pod frontend] -->|Permitido por regla Ingress| DB[Pod de base de datos]
+    B[Otro pod] -.->|No permitido por esa política| DB
+    DB -.->|Egress de DB no está aislado| C[Pod no seleccionado]
+```
 
-![zero-trust](images/image-09.jpg)
+Para una conexión entre dos _pods_, se deben permitir las direcciones que estén aisladas: el `Egress` del origen y el `Ingress` del destino. El tráfico de respuesta de una conexión permitida se admite automáticamente. Una política de red no crea una ruta ni publica un servicio en Internet; la exposición externa se configura por separado mediante mecanismos como `Service` o `Ingress`.
 
-**Flujo típico con NetworkPolicy:**
+### 3.3 Zero Trust: enfoque de seguridad complementario
 
-1. Creas una `NetworkPolicy` con etiqueta `namespaceSelector: role: backend` en `Ingress`
-2. Los pods con esa etiqueta pueden entrar al puerto 5432
-3. Cualquier otro pod recibe TCP RST o timeout (conexión rechazada)
-4. Los logs de denegate se escriben en `kube-apiserver` (si auditoria está habilitada)
+Zero Trust es un enfoque más amplio que busca verificar cada acceso y aplicar el mínimo privilegio; no es un modo de `NetworkPolicy`. Puede combinar aislamiento de red con controles adicionales, según la arquitectura:
+
+- **NetworkPolicy:** filtra tráfico de red por _pods_, _namespaces_, direcciones y puertos (capa 3/4), si el CNI implementa su cumplimiento.
+- **Identidad y autenticación de cargas de trabajo:** verifican quién se comunica; por ejemplo, mediante mTLS cuando la plataforma lo soporta y está configurada.
+- **Autorización y observabilidad:** determinan qué acciones se permiten y permiten registrar o analizar accesos mediante mecanismos específicos.
+
+Por lo tanto, `Default Deny` puede ser una capa de una arquitectura Zero Trust, pero no proporciona por sí sola mTLS, autenticación, autorización de aplicación ni una garantía de “seguridad máxima”.
 
 ---
 
@@ -104,12 +112,12 @@ En NetworkPolicies, especificas protocolo + puerto para cada regla:
 | **PostgreSQL** | 5432 | TCP | backend pods en namespace: production |
 | **Redis** | 6379 | TCP | app pods, cache services |
 | **DNS (CoreDNS)** | 53 | UDP | todos (sin DNS, descubrimiento falla) |
-| **HTTPS Ingress** | 443 | TCP | INTERNET (ingress controller) |
+| **HTTPS Ingress** | 443 | TCP | Pods del Ingress Controller; el tráfico externo depende de la arquitectura del clúster y del CNI |
 | **Prometheus** | 9090 | TCP | monitoring namespace |
 | **Etcd** | 2379 | TCP | solo control plane (muy restrictivo) |
 
 ```yaml
-# Ejemplo: Permitir solo PostgreSQL desde backend pods
+# Ejemplo: Permitir PostgreSQL solo desde pods de aplicación en namespaces backend
 spec:
   policyTypes:
     - Ingress
@@ -121,7 +129,7 @@ spec:
     - namespaceSelector:
         matchLabels:
           role: backend
-    - podSelector:
+      podSelector:
         matchLabels:
           tier: application
     ports:
@@ -131,14 +139,16 @@ spec:
 
 ---
 
-## 5. Integración con observabilidad
+## 5. Observabilidad de las políticas de red
 
-Cuando deniegas tráfico, ¿cómo lo vemos?
+Una `NetworkPolicy` define las reglas; la aplicación y observabilidad del tráfico dependen del CNI y de las herramientas que se configuren. El plano de control de Kubernetes almacena los objetos de política, pero no registra por defecto cada paquete permitido o denegado.
 
-- **Logs de Ingress Controller:** `kubectl logs -f <ingress-pod>` te muestra qué solicitudes HTTP fueron rechazadas
-- **Logs de CNI:** Si usas Cilium, tienes visibilidad L7 automática (qué usuario, qué endpoint, qué error)
-- **Prometheus + Grafana:** Puedes graficar tráfico permitido vs denegado por pod/namespace
-- **Auditoría de Kubernetes:** Si habilitaste audit logging, tendrás registro de intentos de conexión
+- **CNI:** Consulta la telemetría o los registros que ofrezca el CNI. Por ejemplo, Cilium puede mostrar flujos con Hubble cuando está instalado y configurado.
+- **Prometheus + Grafana:** Permiten visualizar métricas de red si el CNI o sus componentes exportan las métricas necesarias.
+- **Ingress Controller:** Sus logs describen solicitudes HTTP que llegan al controlador; no son un registro general de paquetes bloqueados por `NetworkPolicy`.
+- **Auditoría de Kubernetes:** Registra solicitudes al API Server, como cambios a los objetos `NetworkPolicy`; no registra los paquetes que el CNI descarta.
+
+El efecto visible de un flujo denegado (por ejemplo, timeout o error de conexión) depende de dónde y cómo el CNI aplique la política. No se debe asumir que el cliente recibe siempre un TCP RST.
 
 ---
 

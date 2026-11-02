@@ -1,12 +1,12 @@
 # **Laboratorio 3.2:** Aislamiento de Red con NetworkPolicy
 
-Implementar modelo Zero Trust bloqueando todo tráfico por defecto y permitiendo solo rutas específicas entre servicios.
+Aplicar aislamiento de red a los Pods seleccionados con una política de denegación predeterminada y reglas explícitas para los flujos necesarios. Este laboratorio trabaja con `NetworkPolicy`; no implementa por sí solo una arquitectura Zero Trust.
 
 ---
 
 ## 🎯 Objetivo
 
-Aplicar políticas de red L3/L4 (NetworkPolicies) en el namespace `production` para aislar completamente payment-service, catalog-service e inventory-service, permitiendo tráfico solo desde Ingress Controller y entre servicios autorizados.
+Aplicar políticas de red L3/L4 en el namespace `production` para aislar los Pods seleccionados en las direcciones `Ingress` y `Egress`, y permitir el tráfico requerido desde Ingress Controller y entre servicios autorizados. La aplicación de las políticas depende de que el CNI del clúster las soporte.
 
 ---
 
@@ -36,14 +36,14 @@ Del Lab 3.1:
 #### Linux y macOS
 
 ```bash
-# Verificar que existe un controlador de red
-kubectl get nodes -o wide | grep -E "INTERNAL-IP|Network"
+# Inspeccionar los Pods del sistema para identificar el CNI instalado
+kubectl get pods -n kube-system -o wide
 
 # Verificar API de NetworkPolicy está disponible
 kubectl api-resources | grep networkpolicies
 
-# Verificar que Calico o Cilium está instalado (si usas Kind con Calico)
-kubectl get ds -n kube-system | grep -E "calico|cilium"
+# Si usas Calico o Cilium, comprobar sus Pods
+kubectl get pods -A | grep -E "calico|cilium"
 ```
 
 #### Windows
@@ -52,11 +52,11 @@ kubectl get ds -n kube-system | grep -E "calico|cilium"
 # Verificar soporte de NetworkPolicy
 kubectl api-resources | Select-String "networkpolic"
 
-# En Minikube con Calico
-minikube addons enable calico
+# Identificar los Pods del CNI instalado
+kubectl get pods -A -o wide
 ```
 
-**Esperado:** API `networkpolicies.networking.k8s.io` disponible.
+**Esperado:** La API `networkpolicies.networking.k8s.io` está disponible y puedes identificar el CNI instalado. Que la API acepte objetos `NetworkPolicy` no confirma por sí solo que el CNI aplique sus reglas; lo validarás con las pruebas de conectividad de este laboratorio.
 
 ---
 
@@ -66,8 +66,8 @@ Crea el archivo `02-deny-all-networkpolicy.yaml`:
 
 ```yaml
 ---
-# Default Deny All: Bloquea todo tráfico de entrada y salida
-# en el namespace production
+# Aísla todos los Pods de production para Ingress y Egress.
+# Las políticas adicionales permitirán después los flujos necesarios.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -99,8 +99,8 @@ kubectl describe networkpolicy default-deny-all -n production
 
 **Resultado esperado:** 
 - NetworkPolicy `default-deny-all` creada
-- Todos los Pods en production ahora tienen tráfico bloqueado
-- Ingress deja de recibir respuestas (HTTP 502)
+- Los Pods de `production` quedan aislados para `Ingress` y `Egress`, salvo las respuestas de conexiones permitidas y las excepciones propias de la implementación de red.
+- Las conexiones afectadas dejan de funcionar. El síntoma visible (por ejemplo, timeout o error HTTP) depende del CNI y del punto donde se aplique el bloqueo; no se garantiza un HTTP 502.
 
 ---
 
@@ -131,7 +131,6 @@ spec:
     ports:
     - protocol: TCP
       port: 8080
-      name: http
 ```
 
 Aplica la política:
@@ -149,14 +148,15 @@ kubectl get ingress -n production
 
 **Esperado:** 
 - NetworkPolicy creada
-- Ingress ahora recibe HTTP 200 desde payment-service
+- El CNI permite el tráfico entrante desde Pods del namespace `ingress-nginx` al puerto 8080 de los Pods seleccionados de `payment-service`.
+- Una solicitud a un endpoint válido de payment-service debe volver a funcionar; verifica el código HTTP y el cuerpo que devuelve la aplicación.
 - `curl https://checkout.local/v1/payment` funciona nuevamente
 
 ---
 
 ### Paso 4: Permitir Comunicación Inter-Servicios (Opcional pero Recomendado)
 
-Si payment-service necesita llamar a catalog-service o inventory-service, crear NetworkPolicy:
+Si `payment-service` necesita llamar a `catalog-service` o `inventory-service`, hay que permitir tanto el `Ingress` de destino como el `Egress` del origen. En este ejemplo, los tres servicios están en `production` y escuchan en el puerto 8080 del Pod. Ajusta etiquetas y puertos si tus manifiestos usan otros valores.
 
 Crea el archivo `04-allow-inter-service.yaml`:
 
@@ -204,6 +204,35 @@ spec:
     ports:
     - protocol: TCP
       port: 8080
+
+---
+# Permite a payment-service iniciar conexiones hacia catalog-service e inventory-service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-payment-egress-to-services
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: payment-service
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: catalog-service
+    ports:
+    - protocol: TCP
+      port: 8080
+  - to:
+    - podSelector:
+        matchLabels:
+          app: inventory-service
+    ports:
+    - protocol: TCP
+      port: 8080
 ```
 
 Aplica:
@@ -222,7 +251,8 @@ Crea el archivo `05-allow-dns.yaml`:
 
 ```yaml
 ---
-# Permite que todos los Pods consulten DNS (puerto 53)
+# Permite que los Pods de production consulten Pods de kube-system
+# en el puerto DNS (UDP y TCP 53).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -241,7 +271,11 @@ spec:
     ports:
     - protocol: UDP
       port: 53
+    - protocol: TCP
+      port: 53
 ```
+
+Esta regla permite el puerto 53 a los Pods de `kube-system`, no exclusivamente a CoreDNS. Para restringirla, comprueba las etiquetas reales de los Pods DNS en tu clúster y añade un `podSelector` junto al `namespaceSelector`. Algunos clústeres usan NodeLocal DNS; en ese caso, adapta la regla a la arquitectura DNS y al CNI instalados.
 
 Aplica:
 
@@ -263,7 +297,7 @@ kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8443:443
 curl -k https://checkout.local:8443/v1/payment
 ```
 
-**Resultado esperado:** HTTP 200 con JSON de payment-service
+**Resultado esperado:** Una respuesta HTTP válida del endpoint `/v1/payment`. El código y el cuerpo deben coincidir con la implementación de `payment-service`.
 
 ---
 
@@ -275,28 +309,35 @@ kubectl run unauthorized-client \
   --image=curlimages/curl \
   --namespace default \
   --rm -it \
-  -- curl --connect-timeout 5 -v http://payment-service.production.svc.cluster.local:8080/v1/payment
+  -- curl --fail --connect-timeout 5 -v http://payment-service.production.svc.cluster.local:8080/v1/payment
 ```
 
-**Resultado esperado:** Connection timeout (bloqueado por NetworkPolicy)
+**Resultado esperado:** La solicitud no obtiene una respuesta HTTP exitosa de payment-service. El error concreto depende del CNI; no se garantiza que sea un timeout. Si no resuelve el nombre DNS, revisa también el Paso 5.
 
 ---
 
-#### Test 3: Tráfico entre servicios (si está permitido)
+#### Test 3: Tráfico entre servicios (si aplicaste el Paso 4)
 
 ```bash
-# Exec dentro de payment-service Pod
-kubectl exec -it -n production deployment/payment-service -- sh
+# Simula un Pod de payment-service para probar las reglas de Egress e Ingress.
+# Ejecuta en production con la etiqueta seleccionada por las políticas.
+kubectl run payment-policy-test \
+  --image=curlimages/curl \
+  --namespace production \
+  --labels app=payment-service \
+  --rm -it \
+  -- curl --connect-timeout 5 -i http://catalog-service:8080/v1/products
 
-# Dentro del Pod:
-# Este debe fallar (si no hay NetworkPolicy de inter-servicio)
-curl --connect-timeout 5 http://catalog-service:8080/v1/catalog
-
-# Este debe fallar también
-curl --connect-timeout 5 http://inventory-service:8080/v1/inventory
+# El Service de inventory-service expone el puerto 80 y lo dirige al 8080 del Pod.
+kubectl run payment-policy-test \
+  --image=curlimages/curl \
+  --namespace production \
+  --labels app=payment-service \
+  --rm -it \
+  -- curl --connect-timeout 5 -i http://inventory-service/v1/inventory
 ```
 
-**Resultado esperado:** Connection timeout (a menos que hayas aplicado las políticas de inter-servicio)
+**Resultado esperado:** Si aplicaste las políticas del Paso 4 y el DNS del Paso 5 está permitido, ambas conexiones deben llegar a sus servicios. El catálogo puede responder según su lógica de aplicación; inventario debe responder con su estado. Si omitiste el Paso 4, no se permite el flujo de `payment-service` a esos servicios. El resultado específico al denegarlo depende del CNI. Comprueba también que las rutas HTTP sean válidas en cada aplicación.
 
 ---
 
@@ -319,11 +360,11 @@ kubectl get networkpolicy -n production -o yaml > networkpolicies-backup.yaml
 
 ## 🔍 Guía de Troubleshooting
 
-### Problema 1: HTTP 502 Bad Gateway después de aplicar Default Deny All
+### Problema 1: Ingress no alcanza payment-service después de aplicar Default Deny All
 
-**Síntomas:** Ingress no puede conectarse a payment-service
+**Síntomas:** La solicitud a través del Ingress falla (por ejemplo, con HTTP 502 o timeout).
 
-**Causa:** No aplicaste la NetworkPolicy de allow-ingress-to-payment
+**Posibles causas:** No aplicaste la NetworkPolicy `allow-ingress-to-payment`, el selector no coincide con las etiquetas del Pod, el puerto destino no es 8080 o el CNI no aplica políticas de red.
 
 **Solución:**
 
@@ -342,9 +383,9 @@ kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep -i "pay
 
 ### Problema 2: Los servicios no pueden resolver nombres DNS
 
-**Síntomas:** `curl http://payment-service` falla dentro de un Pod
+**Síntomas:** El nombre del Service no resuelve desde un Pod de `production`.
 
-**Causa:** No aplicaste la política allow-dns
+**Posibles causas:** No aplicaste la política `allow-dns`, el selector no coincide con los Pods DNS o el clúster usa una arquitectura DNS que requiere otra regla.
 
 **Solución:**
 
@@ -358,32 +399,18 @@ kubectl exec -it -n production deployment/payment-service -- nslookup payment-se
 
 ---
 
-### Problema 3: CNI no soporta NetworkPolicies
+### Problema 3: Las NetworkPolicies existen, pero no se aplica el bloqueo
 
 **Síntomas:** 
 ```
 NetworkPolicy creada pero tráfico no se bloquea
 ```
 
-**Causa:** CNI default de Kubernetes (kubenet) no soporta NetworkPolicies
+**Causa:** La API de Kubernetes acepta y guarda los objetos `NetworkPolicy`, pero el CNI instalado puede no aplicar sus reglas o no estar configurado para hacerlo. La presencia de la API no confirma el soporte efectivo.
 
 **Solución:**
 
-```bash
-# En Minikube, instalar Calico
-minikube addons enable calico
-
-# En Kind, agregar Calico al crear cluster
-kind create cluster --config - <<EOF
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-networking:
-  networkPolicy: true
-EOF
-
-# Instalar CNI manualmente si necesario
-kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml
-```
+Verifica qué CNI está instalado y confirma en su documentación cómo habilitar NetworkPolicy para tu distribución y versión de Kubernetes. No instales un segundo CNI sobre un clúster activo sin seguir el procedimiento de migración recomendado para ese entorno. Después, repite los Tests 1 y 2 para comprobar que el tráfico permitido y el denegado se comportan como se espera.
 
 ---
 
@@ -406,14 +433,14 @@ kubectl describe networkpolicy allow-ingress-to-payment -n production
 ```bash
 curl -k https://checkout.local:8443/v1/payment
 ```
-**Screenshot esperado:** HTTP 200 OK
+**Screenshot esperado:** Respuesta HTTP del endpoint de payment-service. El código y el cuerpo dependen de la implementación de la aplicación.
 
 ### 4. Tráfico Bloqueado desde Pod No Autorizado
 ```bash
 kubectl run test-pod --image=curlimages/curl --namespace default --rm -it -- \
-  curl --connect-timeout 3 http://payment-service.production.svc.cluster.local:8080/v1/payment
+  curl --fail --connect-timeout 3 http://payment-service.production.svc.cluster.local:8080/v1/payment
 ```
-**Screenshot esperado:** Connection timeout (bloqueado)
+**Screenshot esperado:** La solicitud no obtiene una respuesta HTTP exitosa. El error concreto depende del CNI.
 
 ### 5. Listado de Políticas Aplicadas
 ```bash
@@ -427,13 +454,13 @@ kubectl get networkpolicy -n production -o wide
 **Preguntas de consolidación:**
 
 1. ¿Cuál es la diferencia entre `default-deny-all` (Ingress + Egress) vs solo Ingress?
-   - Respuesta: Default deny-all bloquea ambas direcciones. Solo Ingress permite egress libre (comunicación saliente).
+   - Respuesta: `default-deny-all` aísla los Pods seleccionados para ambas direcciones. Una política que sólo aísla `Ingress` deja permitido `Egress`, siempre que ninguna otra política aisle también esa dirección. Las conexiones de respuesta a flujos permitidos se admiten.
 
 2. ¿Por qué permitir tráfico a kube-dns (puerto 53)?
-   - Respuesta: Sin DNS, los Pods no pueden resolver nombres (ej: `payment-service`). Necesitan llamar a kube-dns.
+   - Respuesta: Si el Egress está aislado, las consultas DNS también necesitan una regla de salida. DNS puede usar UDP y TCP por el puerto 53; la regla debe ajustarse a los selectores y la arquitectura DNS del clúster.
 
 3. ¿Qué sucede si aplicas default-deny-all pero olvidas crear la política de allow-ingress?
-   - Respuesta: Ingress devuelve 502 Bad Gateway porque no puede alcanzar los Pods.
+   - Respuesta: El tráfico desde el Ingress Controller a los Pods seleccionados no está permitido; la solicitud falla, pero el síntoma exacto depende del CNI y del Ingress Controller.
 
 ---
 
@@ -447,7 +474,7 @@ kubectl get networkpolicy -n production -o wide
 **Relación con unidades anteriores:**
 - U2 aprendió sobre Services y Deployments
 - U3.1 aprendió Ingress (punto de entrada externo)
-- U3.2 (aquí) agrega seguridad de red (Zero Trust)
+- U3.2 (aquí) agrega aislamiento de red con reglas explícitas. `NetworkPolicy` es una posible capa de una estrategia Zero Trust, pero este laboratorio no configura por sí solo identidad, mTLS ni autorización de aplicación.
 
 ---
 
