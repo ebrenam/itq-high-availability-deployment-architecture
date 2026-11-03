@@ -179,11 +179,11 @@ kubectl get pod $PROXY_POD -n envoy-gateway-system -o yaml | Select-String -Cont
 
 **Por qué:** Comienza con "bloquear todo", luego abre explícitamente lo necesario (Whitelist).
 
-**En Linux/macOS:**
+**Crear archivo `payment-deny-all.yaml`:**
 
-```bash
-# Crear archivo de política
-cat > payment-deny-all.yaml << 'EOFILE'
+Genera el archivo con el siguiente contenido:
+
+```yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -197,37 +197,11 @@ spec:
   - Ingress
   - Egress
   # Intencionalmente vacío: niega TODO
-EOFILE
-
-# Aplicar política
-kubectl apply -f payment-deny-all.yaml
-
-# Verificar
-kubectl get networkpolicy -n production
-kubectl describe networkpolicy payment-deny-all -n production
 ```
 
-**En Windows (PowerShell):**
+**Aplicar política:**
 
-```powershell
-# Crear archivo (o editar en VS Code)
-$policy = @'
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: payment-deny-all
-  namespace: production
-spec:
-  podSelector:
-    matchLabels:
-      app: payment-service
-  policyTypes:
-  - Ingress
-  - Egress
-'@
-
-$policy | Out-File -FilePath payment-deny-all.yaml -Encoding UTF8
-
+```bash
 kubectl apply -f payment-deny-all.yaml
 
 kubectl get networkpolicy -n production
@@ -310,10 +284,11 @@ kubectl get pod $ENVOY_POD -n envoy-gateway-system -o yaml | Select-String -Cont
 
 Anota las etiquetas clave (típicamente `app: envoy` o `gateway.envoyproxy.io/owned-by: <gateway-name>`).
 
-**Crear política Allow Ingress:**
+**Crear archivo `allow-payment-ingress.yaml`:**
 
-```bash
-cat > allow-payment-ingress.yaml << 'EOFILE'
+Genera el archivo con el siguiente contenido:
+
+```yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -336,43 +311,11 @@ spec:
     ports:
     - protocol: TCP
       port: 8080
-EOFILE
-
-kubectl apply -f allow-payment-ingress.yaml
-
-kubectl describe networkpolicy allow-payment-ingress -n production
 ```
 
-**En Windows:**
+**Aplicar política:**
 
-```powershell
-$policy = @'
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-payment-ingress
-  namespace: production
-spec:
-  podSelector:
-    matchLabels:
-      app: payment-service
-  policyTypes:
-  - Ingress
-  ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: envoy-gateway-system
-      podSelector:
-        matchLabels:
-          app: envoy
-    ports:
-    - protocol: TCP
-      port: 8080
-'@
-
-$policy | Out-File -FilePath allow-payment-ingress.yaml -Encoding UTF8
-
+```bash
 kubectl apply -f allow-payment-ingress.yaml
 
 kubectl describe networkpolicy allow-payment-ingress -n production
@@ -393,8 +336,11 @@ kubectl describe networkpolicy allow-payment-ingress -n production
 
 **Por qué:** Sin DNS, `catalog-service` y `inventory-service` no se resuelven (necesita llamar a CoreDNS).
 
-```bash
-cat > allow-payment-dns.yaml << 'EOFILE'
+**Crear archivo `allow-payment-dns.yaml`:**
+
+Genera el archivo con el siguiente contenido:
+
+```yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -416,42 +362,11 @@ spec:
       port: 53
     - protocol: TCP
       port: 53
-EOFILE
-
-kubectl apply -f allow-payment-dns.yaml
-
-kubectl get networkpolicy -n production
 ```
 
-**En Windows:**
+**Aplicar política:**
 
-```powershell
-$policy = @'
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-payment-dns
-  namespace: production
-spec:
-  podSelector:
-    matchLabels:
-      app: payment-service
-  policyTypes:
-  - Egress
-  egress:
-  - to:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: kube-system
-    ports:
-    - protocol: UDP
-      port: 53
-    - protocol: TCP
-      port: 53
-'@
-
-$policy | Out-File -FilePath allow-payment-dns.yaml -Encoding UTF8
-
+```bash
 kubectl apply -f allow-payment-dns.yaml
 
 kubectl get networkpolicy -n production
@@ -469,8 +384,11 @@ kubectl get networkpolicy -n production
 
 **Por qué:** Si payment-service orquesta llamadas a otros servicios, las necesita.
 
-```bash
-cat > allow-payment-egress.yaml << 'EOFILE'
+**Crear archivo `allow-payment-egress.yaml`:**
+
+Genera el archivo con el siguiente contenido:
+
+```yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -499,45 +417,11 @@ spec:
     ports:
     - protocol: TCP
       port: 8080
-EOFILE
-
-kubectl apply -f allow-payment-egress.yaml
 ```
 
-**En Windows:**
+**Aplicar política:**
 
-```powershell
-$policy = @'
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-payment-egress-to-services
-  namespace: production
-spec:
-  podSelector:
-    matchLabels:
-      app: payment-service
-  policyTypes:
-  - Egress
-  egress:
-  - to:
-    - podSelector:
-        matchLabels:
-          app: catalog-service
-    ports:
-    - protocol: TCP
-      port: 8080
-  - to:
-    - podSelector:
-        matchLabels:
-          app: inventory-service
-    ports:
-    - protocol: TCP
-      port: 8080
-'@
-
-$policy | Out-File -FilePath allow-payment-egress.yaml -Encoding UTF8
-
+```bash
 kubectl apply -f allow-payment-egress.yaml
 ```
 

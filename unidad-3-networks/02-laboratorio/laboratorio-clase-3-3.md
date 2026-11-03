@@ -107,10 +107,11 @@ kubectl get pods -n production -l app=payment-service `
 
 **Por qué:** Aunque la app no use API Kubernetes, es práctica establecer autorización mínima.
 
-**En Linux/macOS:**
+**Crear archivo `payment-rbac.yaml`:**
 
-```bash
-cat > payment-rbac.yaml << 'EOFILE'
+Genera el archivo con el siguiente contenido:
+
+```yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -142,42 +143,15 @@ subjects:
   - kind: ServiceAccount
     name: payment-service-sa
     namespace: production
-EOFILE
-
-# Aplicar
-kubectl apply -f payment-rbac.yaml
-
-# Verificar
-kubectl get serviceaccount,role,rolebinding -n production | grep payment
 ```
 
-**En Windows (PowerShell):**
+**Aplicar:**
 
-```powershell
-$rbac = @'
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: payment-service-sa
-  namespace: production
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: payment-service-reader
-  namespace: production
-rules:
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    resourceNames: ["payment-config"]
-    verbs: ["get"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: payment-service-reader-binding
-  namespace: production
-roleRef:
+```bash
+kubectl apply -f payment-rbac.yaml
+
+kubectl get serviceaccount,role,rolebinding -n production | grep payment
+```
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: payment-service-reader
@@ -279,10 +253,11 @@ kubectl auth can-i delete pods `
 
 **Por qué:** Reduce la superficie de ataque en caso de compromiso.
 
-**Crear parche (estratégico):**
+**Crear archivo `payment-security-patch.yaml`:**
 
-```bash
-cat > payment-security-patch.yaml << 'EOFILE'
+Genera el archivo con el siguiente contenido:
+
+```yaml
 spec:
   template:
     spec:
@@ -302,9 +277,11 @@ spec:
           capabilities:
             drop:
             - ALL
-EOFILE
+```
 
-# Aplicar parche al Deployment
+**Aplicar parche:**
+
+```bash
 kubectl patch deployment payment-service -n production \
   --type=strategic \
   --patch-file=payment-security-patch.yaml
@@ -454,10 +431,11 @@ kubectl get namespace production --show-labels
 
 **Por qué:** Confirmar que PSA está validando correctamente.
 
-**Crear Pod incumplidor:**
+**Crear archivo `insecure-pod.yaml`:**
 
-```bash
-cat > insecure-pod.yaml << 'EOFILE'
+Genera el archivo con el siguiente contenido:
+
+```yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -472,43 +450,14 @@ spec:
   - name: test
     image: busybox:1.35
     command: ["sleep", "3600"]
-EOFILE
-
-# Intentar crear
-kubectl apply -f insecure-pod.yaml
-
-# Ver si se creó con warnings
-kubectl describe pod insecure-test -n production | head -30
-
-# Limpiar
-kubectl delete pod insecure-test -n production
 ```
 
-**En Windows (PowerShell):**
+**Intentar crear:**
 
-```powershell
-$pod = @'
-apiVersion: v1
-kind: Pod
-metadata:
-  name: insecure-test
-  namespace: production
-spec:
-  serviceAccountName: default
-  automountServiceAccountToken: true
-  securityContext:
-    runAsUser: 0
-  containers:
-  - name: test
-    image: busybox:1.35
-    command: ["sleep", "3600"]
-'@
-
-$pod | Out-File -FilePath insecure-pod.yaml -Encoding UTF8
-
+```bash
 kubectl apply -f insecure-pod.yaml
 
-kubectl describe pod insecure-test -n production | Select-Object -First 30
+kubectl describe pod insecure-test -n production | head -30
 
 kubectl delete pod insecure-test -n production
 ```

@@ -71,6 +71,28 @@ Al preparar la siguiente edición, revisar primero seguridad de Secrets y veraci
 
 ---
 
+## 📋 Reglas de Documentación Establecidas
+
+### 1. **NO duplicar contenido multiplataforma en labs**
+
+**Regla:** Solo separar pasos por Sistema Operativo (Linux/Windows/macOS) cuando el contenido es **exclusivamente dependiente** de la plataforma.
+
+**NO separar cuando:**
+- ✅ Crear archivos YAML/JSON (formato estándar)
+- ✅ Comandos `kubectl` (abstraído por SO)
+- ✅ Editar archivos de código fuente (Java, etc.)
+- ✅ Instrucciones conceptuales o de verificación
+
+**SÍ separar cuando:**
+- ✅ Comandos shell distintos (bash vs PowerShell)
+- ✅ Rutas de archivo (Windows usa `\`, Linux usa `/`)
+- ✅ Variables de entorno y sintaxis de exportación diferente
+- ✅ Herramientas SO-específicas (WSL, Docker Desktop config en Windows)
+
+**Aplicado en:** laboratorio-clase-3-1.md, laboratorio-clase-3-2.md, laboratorio-clase-3-3.md
+
+---
+
 ## ✨ Hallazgos Positivos de Revisión 2026-11-02
 
 ### Continuidad de Proyectos: EXCELENTE

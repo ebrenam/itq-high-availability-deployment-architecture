@@ -14,7 +14,7 @@
 
 ---
 
-## 📋 Requisitos previos
+## Requisitos previos
 
 - Minikube v1.32+ o Kind con Kubernetes 1.28+ instalado y ejecutándose
 - Maven 3.9+ y JDK 21+
@@ -24,7 +24,7 @@
 - Acceso a los directorios de U2: `proyecto-base-unidad-02/catalog-service` e `inventory-service`
 - Los comandos con sintaxis Bash se ejecutan en Linux/macOS, WSL o Git Bash
 
-## 📝 Notas pedagógicas previas
+## Notas pedagógicas previas
 
 **Versiones en este laboratorio:**
 - `catalog-service:1.0.0` (sin cambios de U2)
@@ -43,7 +43,7 @@
 
 **Por qué:** Necesitamos versiones consistentes de catalog e inventory antes de crear payment.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **En Linux/macOS:**
 
 ```bash
 # Colócate en el directorio del proyecto base de U3
@@ -78,7 +78,7 @@ Select-String "<version>" inventory-service/pom.xml | Select-Object -First 1
 
 **Por qué:** Semantic versioning: MINOR bump para endpoint nuevo backward-compatible.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **En Linux/macOS:**
 
 ```bash
 # Abre el archivo pom.xml en tu editor
@@ -113,18 +113,19 @@ Select-String "<version>" inventory-service/pom.xml | Select-Object -First 1
 
 **Por qué:** payment-service necesitará reservar stock antes de procesar pagos.
 
-Lee el archivo actual:
+**Abrir archivo y ver contenido actual:**
 
 ```bash
 cat inventory-service/src/main/java/com/ecom/inventory/InventoryResource.java
 ```
 
-Modifica el archivo agregando el siguiente método dentro de la clase `InventoryResource` (antes del cierre de llaves final `}`):
+**Agregar método a InventoryResource:**
 
-**En Linux/macOS (usando cat con heredoc):**
+Abre el archivo `inventory-service/src/main/java/com/ecom/inventory/InventoryResource.java` en tu editor (VS Code, Vi, nano). 
 
-```bash
-cat >> inventory-service/src/main/java/com/ecom/inventory/InventoryResource.java << 'EOF'
+Ubica el cierre de la clase (antes de la última `}`). Agrega el siguiente código:
+
+```java
 
     @POST
     @Path("/reserve")
@@ -153,11 +154,9 @@ cat >> inventory-service/src/main/java/com/ecom/inventory/InventoryResource.java
         String status,
         Instant timestamp
     ) {}
-
-EOF
 ```
 
-**En Windows (PowerShell):** Abre el archivo en VS Code, navega hasta el final de la clase (antes de `}`) y pega el código anterior.
+> **Nota:** Copia el código anterior, pégalo en el archivo antes del cierre de la clase. Guarda con Ctrl+S (o Cmd+S en macOS).
 
 **Qué observar:** El archivo ahora tiene dos métodos: `@GET /inventory` (heredado) y `@POST /reserve` (nuevo).
 
@@ -302,63 +301,9 @@ Select-String "<version>" pom.xml | Select-Object -First 1
 
 **Por qué:** Es la "puerta de entrada" de payment-service; orquesta las llamadas a otros servicios.
 
-**En Linux/macOS:**
+**Crear archivo `src/main/java/com/ecom/payment/PaymentResource.java`:**
 
-```bash
-# Crea archivo
-cat > src/main/java/com/ecom/payment/PaymentResource.java << 'EOFILE'
-package com.ecom.payment;
-
-import jakarta.inject.Inject;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.MediaType;
-import java.time.Instant;
-import java.util.UUID;
-
-@Path("/v1/payments")
-@Consumes(MediaType.APPLICATION_JSON)
-@Produces(MediaType.APPLICATION_JSON)
-public class PaymentResource {
-
-    @Inject
-    PaymentService paymentService;
-
-    @POST
-    public PaymentResponse processPayment(PaymentRequest request) {
-        try {
-            return paymentService.processPayment(request);
-        } catch (Exception e) {
-            return new PaymentResponse(
-                UUID.randomUUID().toString().substring(0, 12),
-                "FAILED",
-                request.productId(),
-                request.quantity(),
-                request.amount(),
-                e.getMessage(),
-                Instant.now()
-            );
-        }
-    }
-
-    // Records de request/response
-    public record PaymentRequest(String productId, int quantity, double amount) {}
-
-    public record PaymentResponse(
-        String transactionId,
-        String status,
-        String productId,
-        int quantity,
-        double amount,
-        String message,
-        Instant timestamp
-    ) {}
-}
-EOFILE
-```
-
-**En Windows (PowerShell):**
-
-Crea archivo `src/main/java/com/ecom/payment/PaymentResource.java` en VS Code y pega:
+Genera el archivo con el siguiente contenido:
 
 ```java
 package com.ecom.payment;
@@ -420,88 +365,9 @@ public class PaymentResource {
 
 **Por qué:** Demuestra patrones reales: @Timeout, @Retry, y decisiones de negocio.
 
-**En Linux/macOS:**
+**Crear archivo `src/main/java/com/ecom/payment/PaymentService.java`:**
 
-```bash
-cat > src/main/java/com/ecom/payment/PaymentService.java << 'EOFILE'
-package com.ecom.payment;
-
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.faulttolerance.Retry;
-import org.eclipse.microprofile.faulttolerance.Timeout;
-import java.time.Instant;
-import java.util.Random;
-import java.util.UUID;
-
-@ApplicationScoped
-public class PaymentService {
-
-    @Inject
-    CatalogClient catalogClient;
-
-    @Inject
-    InventoryClient inventoryClient;
-
-    private static final Random random = new Random();
-
-    @Timeout(3000) // 3 segundos total
-    public PaymentResource.PaymentResponse processPayment(PaymentResource.PaymentRequest request) {
-        String transactionId = UUID.randomUUID().toString().substring(0, 12);
-
-        try {
-            // 1. Validar producto con reintentos
-            String product = validateProductWithRetry(request.productId());
-            
-            // 2. Reservar inventario con reintentos
-            String reservationStatus = reserveInventoryWithRetry(request.productId(), request.quantity());
-            
-            if (!"RESERVED".equals(reservationStatus)) {
-                return new PaymentResource.PaymentResponse(
-                    transactionId, "FAILED", request.productId(), 
-                    request.quantity(), request.amount(), 
-                    "Inventory reservation failed", Instant.now()
-                );
-            }
-
-            // 3. Simular procesamiento de pago (90% éxito, 10% fallo)
-            boolean paymentSucceeded = random.nextDouble() < 0.9;
-            
-            String status = paymentSucceeded ? "APPROVED" : "DECLINED";
-            String message = paymentSucceeded 
-                ? "Payment processed for " + product 
-                : "Payment declined by issuer";
-
-            return new PaymentResource.PaymentResponse(
-                transactionId, status, request.productId(), 
-                request.quantity(), request.amount(), message, Instant.now()
-            );
-
-        } catch (Exception e) {
-            return new PaymentResource.PaymentResponse(
-                transactionId, "FAILED", request.productId(),
-                request.quantity(), request.amount(),
-                "Error: " + e.getMessage(), Instant.now()
-            );
-        }
-    }
-
-    @Retry(maxRetries = 2, delay = 200)
-    @Timeout(1000)
-    private String validateProductWithRetry(String productId) {
-        return catalogClient.getProduct(productId);
-    }
-
-    @Retry(maxRetries = 2, delay = 200)
-    @Timeout(1000)
-    private String reserveInventoryWithRetry(String productId, int quantity) {
-        return inventoryClient.reserveInventory(productId, quantity);
-    }
-}
-EOFILE
-```
-
-**En Windows:** Crea `src/main/java/com/ecom/payment/PaymentService.java` y pega el contenido anterior.
+Genera el archivo con el siguiente contenido:
 
 **Qué observar:** La clase usa `@Timeout` para timeout de 3 segundos total, con `@Retry` para reintentos en llamadas a clientes. Esto es resilience real.
 
@@ -515,41 +381,9 @@ EOFILE
 
 **Por qué:** payment-service necesita validar que el producto existe antes de procesar pago.
 
-**En Linux/macOS:**
+**Crear archivo `src/main/java/com/ecom/payment/CatalogClient.java`:**
 
-```bash
-cat > src/main/java/com/ecom/payment/CatalogClient.java << 'EOFILE'
-package com.ecom.payment;
-
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.core.MediaType;
-
-@ApplicationScoped
-public class CatalogClient {
-
-    private static final String CATALOG_URL = "http://catalog-service:80";
-
-    public String getProduct(String productId) {
-        try (Client client = ClientBuilder.newClient()) {
-            String response = client
-                .target(CATALOG_URL)
-                .path("/v1/products/{id}")
-                .resolveTemplate("id", productId)
-                .request(MediaType.APPLICATION_JSON)
-                .get(String.class);
-            
-            return response != null ? "Product: " + response : "Product unknown";
-        } catch (Exception e) {
-            throw new RuntimeException("Catalog service unavailable: " + e.getMessage());
-        }
-    }
-}
-EOFILE
-```
-
-**En Windows:** Crea `src/main/java/com/ecom/payment/CatalogClient.java` con el contenido anterior.
+Genera el archivo con el siguiente contenido:
 
 **Qué observar:** URL es `http://catalog-service:80`. Este es nombre DNS interno de Kubernetes; resuelve a la IP del Service.
 
@@ -563,57 +397,9 @@ EOFILE
 
 **Por qué:** payment-service debe reservar stock antes de procesar pago.
 
-**En Linux/macOS:**
+**Crear archivo `src/main/java/com/ecom/payment/InventoryClient.java`:**
 
-```bash
-cat > src/main/java/com/ecom/payment/InventoryClient.java << 'EOFILE'
-package com.ecom.payment;
-
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.core.MediaType;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-@ApplicationScoped
-public class InventoryClient {
-
-    private static final String INVENTORY_URL = "http://inventory-service:80";
-    private static final ObjectMapper mapper = new ObjectMapper();
-
-    public String reserveInventory(String productId, int quantity) {
-        try (Client client = ClientBuilder.newClient()) {
-            // Construir JSON de request
-            String requestBody = mapper.writeValueAsString(
-                new ReservationRequest(productId, quantity)
-            );
-            
-            String response = client
-                .target(INVENTORY_URL)
-                .path("/v1/inventory/reserve")
-                .request(MediaType.APPLICATION_JSON)
-                .post(jakarta.ws.rs.client.Entity.json(requestBody), String.class);
-            
-            return response.contains("RESERVED") ? "RESERVED" : "FAILED";
-        } catch (Exception e) {
-            throw new RuntimeException("Inventory service unavailable: " + e.getMessage());
-        }
-    }
-
-    private static class ReservationRequest {
-        public String productId;
-        public int quantity;
-        
-        public ReservationRequest(String productId, int quantity) {
-            this.productId = productId;
-            this.quantity = quantity;
-        }
-    }
-}
-EOFILE
-```
-
-**En Windows:** Crea `src/main/java/com/ecom/payment/InventoryClient.java` con el contenido anterior.
+Genera el archivo con el siguiente contenido:
 
 **Qué observar:** URL es `http://inventory-service:80` (DNS interno). POST envía JSON con productId y quantity.
 
@@ -627,19 +413,9 @@ EOFILE
 
 **Por qué:** Ports, health endpoints, y nombre de aplicación.
 
-**En Linux/macOS:**
+**Crear o editar archivo `src/main/resources/application.properties`:**
 
-```bash
-cat > src/main/resources/application.properties << 'EOFILE'
-quarkus.http.port=8080
-quarkus.http.host=0.0.0.0
-quarkus.application.name=payment-service
-quarkus.application.version=1.0.0
-quarkus.smallrye-health.root-path=/health
-EOFILE
-```
-
-**En Windows:** Crea o edita `src/main/resources/application.properties`:
+Copia el siguiente contenido:
 
 ```properties
 quarkus.http.port=8080
@@ -710,112 +486,15 @@ cd ..
 
 **Por qué:** Necesitamos describir cómo correr payment-service en el clúster.
 
-**En Linux/macOS:**
+**Crear directorio `payment-service/k8s/`:**
 
 ```bash
-# Crear directorio para manifiestos
 mkdir -p payment-service/k8s
-
-# Crear deployment
-cat > payment-service/k8s/01-deployment.yaml << 'EOFILE'
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: payment-service
-  namespace: production
-  labels:
-    app: payment-service
-    version: v1.0.0
-spec:
-  replicas: 2
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
-  selector:
-    matchLabels:
-      app: payment-service
-  template:
-    metadata:
-      labels:
-        app: payment-service
-    spec:
-      containers:
-        - name: payment-service
-          image: <tu_usuario>/payment-service:1.0.0
-          imagePullPolicy: Always
-          ports:
-            - name: http
-              containerPort: 8080
-          env:
-            - name: QUARKUS_HTTP_PORT
-              value: "8080"
-          livenessProbe:
-            httpGet:
-              path: /health/live
-              port: http
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /health/ready
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 2
-          startupProbe:
-            httpGet:
-              path: /health/startup
-              port: http
-            failureThreshold: 30
-            periodSeconds: 2
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-EOFILE
-
-# Crear service
-cat > payment-service/k8s/02-service.yaml << 'EOFILE'
-apiVersion: v1
-kind: Service
-metadata:
-  name: payment-service
-  namespace: production
-  labels:
-    app: payment-service
-spec:
-  type: ClusterIP
-  selector:
-    app: payment-service
-  ports:
-    - name: http
-      port: 80
-      targetPort: http
-      protocol: TCP
-EOFILE
-
-# Verifica archivos creados
-ls -la payment-service/k8s/
-cat payment-service/k8s/01-deployment.yaml
 ```
 
-**En Windows (PowerShell):**
+**Crear archivo `payment-service/k8s/01-deployment.yaml`:**
 
-```powershell
-mkdir payment-service/k8s -Force
-
-# Crear deployment.yaml en VS Code en esa ubicación
-
-# Crear service.yaml en VS Code
-```
-
-Contenido de `01-deployment.yaml`:
+Genera el archivo con el siguiente contenido:
 
 ```yaml
 apiVersion: apps/v1
@@ -880,7 +559,9 @@ spec:
               memory: 512Mi
 ```
 
-Contenido de `02-service.yaml`:
+**Crear archivo `payment-service/k8s/02-service.yaml`:**
+
+Genera el archivo con el siguiente contenido:
 
 ```yaml
 apiVersion: v1
@@ -1131,13 +812,11 @@ kubectl create secret tls payment-tls-secret \
   --namespace=production
 ```
 
-Crear manifiestos de Gateway y HTTPRoute (Linux/macOS):
+**Crear archivo `payment-service/k8s/03-gateway.yaml`:**
 
-```bash
-# Crear manifiestos
-mkdir -p payment-service/k8s
+Genera el archivo con el siguiente contenido:
 
-cat > payment-service/k8s/03-gateway.yaml << 'EOFILE'
+```yaml
 apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
@@ -1210,19 +889,11 @@ spec:
           requestRedirect:
             scheme: https
             statusCode: 301
-EOFILE
-
-# Aplicar manifiestos
-kubectl apply -f payment-service/k8s/03-gateway.yaml
-
-# Verifica recursos creados
-kubectl get gatewayclass,gateway,httproute -n production
-kubectl describe gateway payment-gateway -n production
 ```
 
-**En Windows:** Crea `payment-service/k8s/03-gateway.yaml` en VS Code con el contenido anterior, luego:
+**Aplicar manifiestos:**
 
-```powershell
+```bash
 kubectl apply -f payment-service/k8s/03-gateway.yaml
 
 kubectl get gatewayclass,gateway,httproute -n production
