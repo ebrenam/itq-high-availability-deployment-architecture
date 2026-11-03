@@ -103,7 +103,7 @@ Por lo tanto, `Default Deny` puede ser una capa de una arquitectura Zero Trust, 
 
 ---
 
-## 4. Protocolos y Puertos Comunes
+## 4. Protocolos y puertos comunes
 
 En NetworkPolicies, especificas protocolo + puerto para cada regla:
 

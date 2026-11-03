@@ -1,4 +1,4 @@
-# 3.3 Seguridad en el Despliegue y Acceso
+# 3.3 Seguridad en el despliegue y acceso
 
 En la sesión anterior analizamos cómo asegurar la conectividad interna mediante el CNI, CoreDNS y _NetworkPolicies_, y ahora en esta sesión llevaremos ese conocimiento a la práctica al explorar RBAC, _ServiceAccounts_ y mecanismos de autenticación.
 
@@ -18,7 +18,7 @@ La autorización en la API del clúster se gestiona mediante cuatro objetos fund
 
 - **`ClusterRoleBinding`:** Otorga los permisos de un `ClusterRole` a un sujeto en todos los _namespaces_ del clúster.
 
-### 1.2 Identidad para aplicaciones: serviceaccounts
+### 1.2 Identidad para aplicaciones: ServiceAccounts
 
 Los usuarios humanos suelen autenticarse mediante proveedores OIDC o certificados X.509, mientras que las cargas de trabajo pueden identificarse con **`ServiceAccounts`**. De forma predeterminada, Kubernetes proyecta en el Pod un token obtenido mediante la API `TokenRequest`; es de duración limitada y el kubelet lo rota. La aplicación puede usarlo para autenticarse ante el API Server, pero la identidad no concede permisos por sí sola: la autorización depende de RBAC y no todos los Pods necesitan un token. Se puede desactivar su montaje automático con `automountServiceAccountToken: false`.
 
@@ -54,73 +54,115 @@ Imagina la seguridad de un hotel de alta gama:
 
 ---
 
-## 3. Arquitectura de Seguridad Multinivel
+## 3. Arquitectura de eguridad multinivel
 
-El diagrama es un ejemplo de una carga que sí consulta el API Server; no todas las aplicaciones necesitan token ni permisos de API.
+Kubernetes implementa **4 capas de seguridad independientes** que se aplican en secuencia. Cada capa es un "checkpoint" que debe pasar para que una solicitud tenga éxito.
+
+### El viaje de una solicitud: Desde el Pod al API Server
+
+Imaginemos que tu aplicación dentro del Pod payment-service quiere listar otros Pods:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ Kubernetes Cluster (kube-apiserver)                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │ Namespace: apps                                      │   │
-│  │ PSA Enforce: Restricted                             │   │
-│  ├──────────────────────────────────────────────────────┤   │
-│  │                                                       │   │
-│  │  ┌────────────────────────────────────────────────┐  │   │
-│  │  │ Deployment (payment-service)                   │  │   │
-│  │  │ ├─ ServiceAccount: payment-app                 │  │   │
-│  │  │ ├─ SecurityContext: runAsNonRoot: true         │  │   │
-│  │  │ └─ Container: readOnlyRootFilesystem: true     │  │   │
-│  │  │                                                 │  │   │
-│  │  │ Pod ───→ (projected, rotating token, optional) │  │   │
-│  │  │           └─ TokenRequest API                  │  │   │
-│  │  └────────────────────────────────────────────────┘  │   │
-│  │           │ ↓ (authenticated request)                │   │
-│  │           │ request authenticated as ServiceAccount│   │
-│  │           ▼                                         │   │
-│  │  ┌────────────────────────────────────────────────┐  │   │
-│  │  │ RBAC RoleBinding                                │  │   │
-│  │  │ ├─ ServiceAccount: payment-app                 │  │   │
-│  │  │ ├─ Role: payment-app-reader                    │  │   │
-│  │  │ └─ Verbs: get, list (pods only)               │  │   │
-│  │  └────────────────────────────────────────────────┘  │   │
-│  │           │ ↓ (authorization check)                 │   │
-│  │           │ ✅ Permitido: get pods                 │   │
-│  │           │ ❌ Bloqueado: delete pods              │   │
-│  │           ▼                                         │   │
-│  │  ┌────────────────────────────────────────────────┐  │   │
-│  │  │ API server response: allowed/forbidden         │  │   │
-│  │  │ {"items": [...pods en namespace apps...]}      │  │   │
-│  │  └────────────────────────────────────────────────┘  │   │
-│  │                                                       │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                                                               │
-└─────────────────────────────────────────────────────────────┘
+PASO 1: ENDURECIMIENTO LOCAL (SecurityContext)
+═══════════════════════════════════════════════
+Pod intenta ejecutar comando:
+  /app > java -jar payment-service.jar
+  
+✅ SecurityContext valida:
+   - ¿Puedo ejecutar como usuario no-root (uid: 1000)?
+   - ¿Es mi filesystem read-only (excepto /tmp)?
+   - ✅ Sí → Continuar
+   - ❌ No → Pod no inicia (CrashLoopBackOff)
+
+│
+▼
+
+PASO 2: AUTENTICACIÓN (¿Quién eres?)
+═════════════════════════════════════
+App dentro del Pod intenta: kubectl get pods
+  
+✅ Kubelet proporciona token del ServiceAccount:
+   ServiceAccount: "payment-app"
+   Token: (jwt firmado por control plane)
+   
+✅ API Server valida la firma:
+   - ¿Quién eres? → ServiceAccount: payment-app
+   - ✅ Válido → Continuar
+   - ❌ Inválido/expirado → Rechazar (HTTP 401)
+
+│
+▼
+
+PASO 3: AUTORIZACIÓN (¿Qué puedes hacer?)
+═══════════════════════════════════════════
+API Server evalúa RBAC:
+  
+✅ Busca RoleBinding que vincule payment-app:
+   Role: payment-app-reader
+   Verbs: [get, list]
+   Resources: [pods]
+   
+✅ Consulta:
+   - ¿Permite payment-app hacer get/list de pods? → Sí
+   - ✅ Permitido → Continuar
+   - ❌ Rechazado (HTTP 403)
+
+│
+▼
+
+PASO 4: ADMISIÓN (¿Cumple políticas del cluster?)
+═══════════════════════════════════════════════════
+Cuando **nuevo Pod es creado**, Pod Security Admission valida:
+  
+✅ Chequea pod-security.kubernetes.io/enforce: restricted
+   - ¿runAsNonRoot: true? ✅
+   - ¿allowPrivilegeEscalation: false? ✅
+   - ¿seccomp válido? ✅
+   - ¿capabilities [ALL] eliminada? ✅
+   - ✅ Cumple → Pod creado
+   - ❌ Incumple → Rechazar (admission webhook)
+
+│
+▼
+
+PASO 5: RED (NetworkPolicy)
+════════════════════════════
+Cuando payment-service intenta conectar a inventory-service:
+  
+✅ CNI evalúa NetworkPolicy:
+   - ¿Hay política Default Deny? ✅ Sí → Revisar Egress
+   - ¿Permite payment-service → inventory-service? ✅ Sí
+   - ✅ Tráfico permitido
+   - ❌ Tráfico bloqueado por CNI (sin respuesta)
+
+│
+▼
+
+✅ SOLICITUD PERMITIDA → App puede listar Pods
 ```
 
-**Flujo de seguridad por capas:**
+### Resumen: Las 4 Capas de seguridad
 
-1. **Capas de Autenticación (¿Quién eres?):**
-   - Usuario: OIDC / Certificado X.509
-   - Pod: token proyectado de ServiceAccount (si está habilitado)
+| Capa | Pregunta | Componente | Acción Si Falla |
+|------|----------|-----------|-----------------|
+| **1. Endurecimiento Local** | ¿Puedo ejecutar con estas restricciones? | `SecurityContext` | Pod no inicia |
+| **2. Autenticación** | ¿Quién eres realmente? | ServiceAccount + Token | HTTP 401 (Unauthorized) |
+| **3. Autorización** | ¿Tienes permiso para esto? | RBAC (Role + RoleBinding) | HTTP 403 (Forbidden) |
+| **4. Admisión** | ¿Tu Pod cumple políticas del cluster? | Pod Security Admission | Pod rechazado |
+| **5. Red** | ¿Puedes comunicarte con otros Pods? | NetworkPolicy + CNI | Tráfico bloqueado silenciosamente |
 
-2. **Capa de Autorización (¿Qué puedes hacer?):**
-   - RBAC evalúa Role + RoleBinding
-   - Respuesta: Permitido / Denegado
+### Puntos Clave
 
-3. **Capa de Admisión (¿Cumple la política de Pods?):**
-   - Pod Security Admission evalúa el Pod según el perfil y modo del namespace
-   - Respuesta: admite, advierte, audita o rechaza según el modo
-
-4. **Capa de endurecimiento y conectividad:**
-   - `SecurityContext` configura atributos de seguridad del proceso y el contenedor (usuario, filesystem y capabilities)
-   - `NetworkPolicy` controla flujos de red entre Pods, si el CNI implementa las políticas
+- **Todas las capas son independientes:** Un Pod puede fallar en admisión pero pasar autenticación
+- **Default allow:** Si no hay política configurada en una capa, se permite (excepto en admisión con `enforce`)
+- **No todas las apps necesitan cada capa:** Una app que no consulta API Server no necesita token ni RBAC
+- **Failures are explicit o silenciosos:** RBAC falla con HTTP 403 (visible); NetworkPolicy falla en silencio (solo logs del CNI)
 
 ---
 
-## 4. RBAC: Verbos Comunes y Ejemplos
+## 4. RBAC: Verbos comunes y ejemplos
+
+RBAC es el mecanismo de Kubernetes para definir "quién puede hacer qué". Un `Role` define acciones permitidas (verbos) sobre recursos específicos; un `RoleBinding` vincula ese `Role` a un `ServiceAccount`. Si un Pod intenta una acción no permitida, el API Server responde con HTTP 403 (Forbidden). La regla fundamental: asigna solo los verbos mínimos que la aplicación realmente necesita.
 
 | Verbo | Típicamente Se Usa Para |
 |-------|------------------------|
@@ -152,7 +194,9 @@ rules:
 
 ---
 
-## 5. Pod Security Standards: Tres Niveles
+## 5. Pod Security Standards: Tres niveles
+
+Pod Security Standards (PSS) define tres perfiles que puedes aplicar a un namespace: `Privileged` (sin restricciones), `Baseline` (previene escalación de privilegios obvia) y `Restricted` (endurecimiento fuerte). Kubernetes valida automáticamente cada nuevo Pod contra el perfil elegido mediante etiquetas en el namespace. Sin PSS, un desarrollador podría desplegar un Pod ejecutando como root con acceso total al filesystem, sin que haya validación automática.
 
 | Nivel | Restricciones | Caso de Uso |
 |-------|--------------|-----------|
@@ -175,9 +219,11 @@ Si el namespace usa modo `enforce` y el Pod incumple el perfil, la admisión lo 
 
 ---
 
-## 6. Cadena de Suministro: Escaneo e Integridad de Imágenes
+## 6. Cadena de suministro: Escaneo e integridad de imágenes
 
-En producción, evita tags mutables como `latest`; fija imágenes por digest o usa tags inmutables y aplica un proceso de análisis y validación:
+Cuando despliegas una imagen Docker en Kubernetes, no sabes automáticamente si contiene vulnerabilidades conocidas o si fue modificada maliciosamente. Una cadena de suministro segura valida la imagen ANTES de permitir el despliegue mediante escaneo de CVEs (Trivy, Grype) y firma digital (Cosign/Sigstore). Una imagen comprometida en producción pone en riesgo todo el cluster.
+
+En producción, **nunca uses tags mutables** como `latest`. Especifica versiones exactas (`v1.2.3`) o digests SHA256 (`sha256:abc123...`). Esto asegura reproducibilidad: hoy despliegas la misma imagen que hace un año.
 
 ```
 1. Desarrollador: Construye imagen y sube a registry
