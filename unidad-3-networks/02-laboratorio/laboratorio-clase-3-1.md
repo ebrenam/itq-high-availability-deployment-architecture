@@ -35,7 +35,7 @@
 
 ---
 
-## 🚀 Pasos del laboratorio
+## Pasos del laboratorio
 
 ### Paso 1: Preparar la carpeta de trabajo
 
@@ -982,7 +982,7 @@ curl --resolve payment.local:8080:127.0.0.1 `
 
 ---
 
-## 🎯 Evidencia y reflexión
+## Evidencia y reflexión
 
 **Documenta estos resultados en tu portafolio:**
 
@@ -1026,7 +1026,7 @@ curl --resolve payment.local:8080:127.0.0.1 `
 
 ---
 
-## 🔗 Continuidad con Laboratorio 3.2
+## Continuidad con Laboratorio 3.2
 
 En el próximo laboratorio, agregaremos `NetworkPolicy` para aislar la comunicación. Antes de ese paso, identifica:
 
@@ -1039,7 +1039,7 @@ En el próximo laboratorio, agregaremos `NetworkPolicy` para aislar la comunicac
 
 ---
 
-## 📚 Fuentes primarias y referencias
+## Fuentes primarias y referencias
 
 - Quarkus 3.40+: REST Client, MicroProfile Fault Tolerance
   - <https://quarkus.io/guides/rest-client>

@@ -20,7 +20,7 @@ Ahora necesitas:
 
 ---
 
-## 📋 Requisitos previos
+## Requisitos previos
 
 - Laboratorio 3.2 **completamente terminado** (NetworkPolicy aplicadas y validadas)
 - payment-service en v1.0.0 ejecutándose con 2 replicas en namespace `production`
@@ -33,7 +33,7 @@ Ahora necesitas:
 
 ---
 
-## 📝 Notas pedagógicas previas
+## Notas pedagógicas previas
 
 **Qué aprenderás:**
 - Diferencia entre ServiceAccount (identidad) y Role/RoleBinding (autorización)
@@ -50,7 +50,7 @@ Ahora necesitas:
 
 ---
 
-## 🚀 Pasos del laboratorio
+## Pasos del laboratorio
 
 ### Paso 1: Revisar Deployment actual de payment-service
 
@@ -151,21 +151,6 @@ subjects:
 kubectl apply -f payment-rbac.yaml
 
 kubectl get serviceaccount,role,rolebinding -n production | grep payment
-```
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: payment-service-reader
-subjects:
-  - kind: ServiceAccount
-    name: payment-service-sa
-    namespace: production
-'@
-
-$rbac | Out-File -FilePath payment-rbac.yaml -Encoding UTF8
-
-kubectl apply -f payment-rbac.yaml
-
-kubectl get serviceaccount,role,rolebinding -n production | Select-String "payment"
 ```
 
 **Qué observar:**
@@ -618,7 +603,7 @@ kubectl get namespace production -o jsonpath='{.metadata.labels}'
 
 ---
 
-## 🔍 Troubleshooting
+## Troubleshooting
 
 ### Problema 1: "Pod falla al iniciar después de read-only"
 
@@ -690,7 +675,7 @@ kubectl apply -f insecure-pod.yaml -v=10
 
 ---
 
-## 📊 Evidencia y Reflexión
+## Evidencia y Reflexión
 
 **Documentar:**
 
@@ -736,7 +721,7 @@ kubectl apply -f insecure-pod.yaml -v=10
 
 ---
 
-## 🔗 Continuidad y Reflexión Final
+## Continuidad y Reflexión Final
 
 **Has completado 3 capas de seguridad:**
 1. **Lab 3.1**: Gateway API con TLS (acceso controlado externamente)
@@ -749,7 +734,7 @@ Ninguna capa por sí sola es suficiente. Juntas forman defensa en profundidad re
 
 ---
 
-## 📚 Fuentes primarias
+## Fuentes primarias
 
 - Kubernetes Docs: Security Context
   - <https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>

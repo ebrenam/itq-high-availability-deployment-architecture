@@ -20,7 +20,7 @@ Ahora necesitas:
 
 ---
 
-## 📋 Requisitos previos
+## Requisitos previos
 
 **🔗 Continuidad:** Este laboratorio es la **continuación directa de Lab 3.1**. Asume que:
 - ✅ Lab 3.1 está **completamente terminado**
@@ -49,7 +49,7 @@ kubectl get gateways
 
 ---
 
-## 📝 Requisitos técnicos adicionales
+## Requisitos técnicos adicionales
 
 - Clúster con **CNI que soporte NetworkPolicy** (Calico, Cilium, Weave, Flannel con plugin, etc.)
 - Minikube: debes tener habilitado el addon: `minikube addons enable network-policy`
@@ -59,7 +59,7 @@ kubectl get gateways
 
 ---
 
-## 📝 Notas pedagógicas previas
+## Notas pedagógicas previas
 
 **Qué aprenderás:** 
 - Cómo aislar Pods por defecto (Deny All)
@@ -72,7 +72,7 @@ kubectl get gateways
 
 ---
 
-## 🚀 Pasos del laboratorio
+## Pasos del laboratorio
 
 ### Paso 1: Verificar que el CNI soporta NetworkPolicy
 
@@ -524,7 +524,7 @@ kubectl get networkpolicy -n production -o wide
 
 ---
 
-## 🔍 Troubleshooting
+## Troubleshooting
 
 ### Problema 1: "Tráfico sigue funcionando aunque aplicué Deny All"
 
@@ -598,7 +598,7 @@ kubectl run dns-test \
 
 ---
 
-## 📊 Validación Final
+## Validación Final
 
 **Checklist de evidencia:**
 
@@ -621,7 +621,7 @@ curl --cacert payment.crt https://payment.local:8443/v1/payments
 
 ---
 
-## 🎓 Reflexión Final
+## Reflexión Final
 
 **Preguntas de aprendizaje:**
 
@@ -636,7 +636,7 @@ curl --cacert payment.crt https://payment.local:8443/v1/payments
 
 ---
 
-## 🔗 Continuidad con Laboratorio 3.3
+## Continuidad con Laboratorio 3.3
 
 En el siguiente laboratorio agregarás:
 - **RBAC:** Identidad de aplicación (ServiceAccount)
@@ -647,7 +647,7 @@ NetworkPolicy + RBAC + SecurityContext = Defensa en profundidad real.
 
 ---
 
-## 📚 Fuentes primarias
+## Fuentes primarias
 
 - Kubernetes Docs: NetworkPolicy
   - <https://kubernetes.io/docs/concepts/services-networking/network-policies/>
@@ -670,7 +670,7 @@ NetworkPolicy + RBAC + SecurityContext = Defensa en profundidad real.
 
 ---
 
-## 📚 Recursos Adicionales
+## Recursos Adicionales
 
 - [Kubernetes NetworkPolicy Documentation](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 - [Calico NetworkPolicy Guide](https://docs.tigera.io/calico/latest/reference/resources/networkpolicy)
