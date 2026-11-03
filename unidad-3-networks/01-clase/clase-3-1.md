@@ -61,6 +61,7 @@ Imagina un gran edificio corporativo de oficinas:
 ![Esquema conceptual de cliente, controlador de entrada, Service y Pods](images/image-02.jpg)
 
 Este diagrama usa NGINX como ejemplo de controlador existente; el Laboratorio 3.1 implementa el patrón con Envoy Gateway y Gateway API.
+
 ---
 
 ## 4. Caso de uso real: Plataforma E-commerce
@@ -83,23 +84,55 @@ El diagrama es una arquitectura conceptual, no los servicios desplegados en el l
 
 ---
 
-## 5. Comparación: Alternativas históricas
+## 5. Comparación: Ingress (API Legacy) vs. Gateway API (Recomendada)
 
-### Infraestructura tradicional (Pre-Kubernetes)
+### Contexto histórico
 
-![mono](images/image-04.jpg)
+Kubernetes ha evolucionado en cómo expone servicios. Ambos modelos coexisten, pero con trajectoria diferente:
 
-### Entrada HTTP con Gateway API
+### Ingress (API congelada desde 2022)
 
-```mermaid
-flowchart LR
-    C[Cliente HTTPS] --> G[Envoy Gateway<br/>Gateway + HTTPRoute]
-    G --> S[Service ClusterIP]
-    S --> P1[Pod]
-    S --> P2[Pod]
-```
+**Características:**
+- ✅ Estable, ampliamente soportado en clusters existentes
+- ✅ Simple: un solo recurso (`Ingress`) define reglas HTTP/HTTPS
+- ❌ API congelada (sin nuevas funcionalidades desde 2022)
+- ❌ Ingeniería de Controladores: cada implementación (NGINX, Traefik, Kong) interpreta spec de forma ligeramente diferente
+- ❌ **Ingress NGINX fue retirado en marzo 2026** y ya no recibe actualizaciones de seguridad
 
-La API `Service` proporciona descubrimiento y acceso estable a Pods tanto si el tráfico externo entra por NodePort, Ingress o Gateway API. Sin un controlador de entrada no hay reglas HTTP compartidas de esa capa; no significa que Kubernetes pierda el DNS interno de Services.
+**Caso de uso típico:** Sistemas heredados que corren en clusters antiguos y no pueden migrar sin riesgo.
+
+### Gateway API (Activamente desarrollada, recomendada desde 2023)
+
+**Características:**
+- ✅ API v1 estable desde agosto 2024 (aprobada por CNCF)
+- ✅ Activamente desarrollada (nuevas funcionalidades cada release)
+- ✅ Soporte creciente: Envoy Gateway, Kong, Nginx Gateway Agent, GKE, AWS ALB Controller
+- ✅ Separa responsabilidades: `GatewayClass` (infraestructura), `Gateway` (listener config), `HTTPRoute` (reglas)
+- ✅ Más flexible: permite extensiones, múltiples controladores, composición modular
+
+**Caso de uso típico:** Nuevos despliegues, plataformas multi-proveedor, arquitecturas cloud-native.
+
+### Comparación lado a lado
+
+| Aspecto | Ingress | Gateway API |
+|--------|---------|-------------|
+| **Estado API** | Congelada (v1, sin cambios) | Activa (v1, evoluciona) |
+| **Controladores** | NGINX (retirado 2026), Traefik, Kong | Envoy (v1.9.3), Kong, Nginx Agent |
+| **Separación de responsabilidades** | No; todo en `Ingress` | Sí; `GatewayClass`, `Gateway`, `HTTPRoute` |
+| **Extensiones** | Limitadas (annotations) | Extensiones nativas |
+| **Portabilidad** | Media (annotations no portables) | Alta (recursos estándar) |
+| **Recomendación CNCF** | Históricamente sí | Sí, actualmente |
+| **Nuevo deployment** | ❌ No recomendado | ✅ Recomendado |
+
+### En esta práctica
+
+Usamos **Gateway API con Envoy Gateway** porque:
+- ✅ Es el camino recomendado por Kubernetes SIG Network
+- ✅ Envoy Gateway es estable, eficiente y seguro
+- ✅ Preparas a estudiantes para arquitecturas modernas
+- ✅ Evitas dependencias retiradas (NGINX)
+
+Ingress sigue siendo un concepto válido que encontrarás en sistemas heredados, pero no es el punto de partida para nuevos diseños.
 
 ---
 

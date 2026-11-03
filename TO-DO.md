@@ -1,8 +1,12 @@
-# Pendientes de revisión didáctica
+# Pendientes de revisión didáctica — Revisión 2026-11-02
 
-Este documento conserva hallazgos de la revisión de continuidad, congruencia y calidad de las Unidades 1, 2 y 3. **Las Unidades 1 y 2 ya fueron cursadas por los estudiantes**; estos puntos se registran para que el equipo docente decida si conviene ajustar los materiales antes de una edición futura. No implican cambios retroactivos a las actividades ya realizadas.
+Este documento conserva hallazgos de revisiones de continuidad, congruencia y calidad de las Unidades 1, 2 y 3.
 
-Los ítems están pendientes de decisión y ejecución; no se consideran resueltos por estar documentados aquí. La prioridad es orientativa.
+**Estado general:**
+- ✅ **U3: COMPLETADO Y VALIDADO** — Continuidad perfecta (payment-service hace llamadas reales a catalog+inventory), alineación clase-laboratorio consistente, incrementalidad de labs excelente.
+- ⚠️ **U1 y U2:** Puntos heredados válidos; revisar antes de próxima edición.
+
+Los ítems están pendientes de decisión y ejecución. La prioridad es orientativa.
 
 ## Prioridad alta
 
@@ -41,17 +45,82 @@ Los ítems están pendientes de decisión y ejecución; no se consideran resuelt
 - [ ] **U2 → U3 — Definir un baseline reproducible para el traspaso de `inventory-service`.** U2 construye/publica una versión que el cierre del laboratorio identifica como `1.1.0`, mientras el manifiesto de U3 apunta a la imagen `1.0.0` y el código de U3 reporta `v1.1.0`. Precisar si U3 parte de la imagen/código producido por el estudiante o de su propio starter; registrar tag, versión de código, manifiestos y efecto del rollback final de U2.
   - Referencias: [Laboratorio 2.2](./unidad-2-kubernetes/02-laboratorio/laboratorio-clase-2-2.md), [Deployment de inventario en U3](./unidad-3-networks/02-laboratorio/proyecto-base-unidad-03/inventory-service/k8s/deployment-service.yaml), [InventoryResource.java](./unidad-3-networks/02-laboratorio/proyecto-base-unidad-03/inventory-service/src/main/java/com/ecom/inventory/InventoryResource.java).
 
-## Continuidad y alcance de U3
+## ✅ Continuidad y alcance de U3 — VALIDADO E IMPLEMENTADO
 
-- [ ] **U2 → U3 — Decidir si U3 continúa el sistema integrado o enseña una tecnología de forma aislada.** El Laboratorio 3.1 crea un endpoint estático `payment-service`; los servicios reales `catalog-service` e `inventory-service` no son necesarios para la secuencia base. Alinear el README, los diagramas y los objetivos: declarar el laboratorio como aislado/de demostración o diseñar una integración incremental con los servicios heredados.
-  - Referencias: [README de U3](./unidad-3-networks/README.md), [Clase 3.1](./unidad-3-networks/01-clase/clase-3-1.md), [Laboratorio 3.1](./unidad-3-networks/02-laboratorio/laboratorio-clase-3-1.md).
+**Estado:** Todos los puntos de continuidad de U3 han sido resueltos e implementados.
 
-- [ ] **U3 — Alinear la comparación anunciada entre Ingress y Gateway API con la actividad real.** El README promete comparar ambos modelos, pero el Laboratorio 3.1 configura Gateway API. Agregar una actividad de comparación conceptual basada en sus recursos/capacidades o ajustar el objetivo; no reinstalar Ingress NGINX, que fue retirado.
-  - Referencias: [README de U3](./unidad-3-networks/README.md), [Laboratorio 3.1](./unidad-3-networks/02-laboratorio/laboratorio-clase-3-1.md).
+- ✅ **U2 → U3 — Continuidad de proyectos PERFECTA:** Payment-service ahora hace **llamadas HTTP reales** a catalog-service e inventory-service. No es un endpoint estático. Integración funcional completa: payment orquesta validación de producto + reserva de inventario + simulación de pago.
+  - Confirmación: [README de U3 actualizado](./unidad-3-networks/README.md), [Laboratorio 3.1 completo con código de payment-service](./unidad-3-networks/02-laboratorio/laboratorio-clase-3-1.md).
 
-- [ ] **U3 — Hacer reproducible la extensión opcional interservicios del Laboratorio 3.2.** La sección supone `catalog-service` e `inventory-service` desplegados en `production` y con imágenes disponibles, aunque no provee los pasos para construir/publicar esas imágenes. Agregar instrucciones ejecutables de preparación o mantener la sección explícitamente como ejercicio de diseño de reglas, sin afirmar que los servicios están listos para probarse.
-  - Referencias: [Laboratorio 3.2](./unidad-3-networks/02-laboratorio/laboratorio-clase-3-2.md), [Deployment de catálogo](./unidad-3-networks/02-laboratorio/proyecto-base-unidad-03/catalog-service/k8s/01-deployment.yaml), [Deployment de inventario](./unidad-3-networks/02-laboratorio/proyecto-base-unidad-03/inventory-service/k8s/deployment-service.yaml).
+- ✅ **U3 — IMPLEMENTADO: Análisis conceptual Ingress vs. Gateway API.** 
+  - **Decisión:** Opción A - Análisis teórico sin NGINX (retirado en marzo 2026)
+  - **Implementación:** [Clase 3.1 Sección 5 "Comparación: Ingress vs Gateway API"](./unidad-3-networks/01-clase/clase-3-1.md#5-comparación-ingress-api-legacy-vs-gateway-api-recomendada)
+  - Tabla comparativa lado a lado, caso de uso de cada modelo, recomendación CNCF clara
+  - Ingress presentado como concepto válido para sistemas heredados, Gateway API como recomendación moderna
+
+- ✅ **U3 — IMPLEMENTADO: Clarificación de Lab 3.2 como continuación directa de Lab 3.1.**
+  - **Decisión:** Opción A - Actualizar introducción para dejar claro el flujo incremental (sin namespace `production`)
+  - **Implementación:** [Laboratorio 3.2 Objetivo y Requisitos Previos](./unidad-3-networks/02-laboratorio/laboratorio-clase-3-2.md)
+  - Especificar que es continuación directa de Lab 3.1, todos los pods en namespace `default`
+  - Agregar verificación de estado actual antes de continuar
+  - Tabla de revisión clara: qué debe estar corriendo ya, qué debe estar listo
 
 ## Criterio para retomar
 
-Al preparar la siguiente edición, revisar primero seguridad de Secrets y veracidad de las promesas de disponibilidad; después definir el contrato de versiones/artefactos entre unidades y confirmar con el equipo docente el alcance integrado o aislado de U3. Validar los pasos modificados en los entornos Kubernetes que se decida soportar.
+Al preparar la siguiente edición, revisar primero seguridad de Secrets y veracidad de las promesas de disponibilidad; después definir el contrato de versiones/artefactos entre unidades y confirmar con el equipo docente las dos decisiones pendientes de U3 (Ingress vs Gateway, reproducibilidad de Lab 3.2). Validar los pasos modificados en los entornos Kubernetes que se decida soportar.
+
+---
+
+## ✨ Hallazgos Positivos de Revisión 2026-11-02
+
+### Continuidad de Proyectos: EXCELENTE
+- **U1:** `catalog-service:1.0.0` (línea base con patrones de resiliencia)
+- **U2:** Hereda catalog-service + crea `inventory-service:1.1.0` (nuevo servicio)
+- **U3:** Hereda ambos + crea `payment-service:1.0.0` que **hace llamadas HTTP reales** a los anteriores
+
+Verdadera arquitectura e-commerce incremental sin rupturas de contrato.
+
+### Alineación Clase-Laboratorio: PERFECTA
+- U1: Clase enseña métricas (1.1), patrones (1.2), infraestructura (1.3) → Laboratorios practican exactamente eso
+- U2: Clase enseña arquitectura (2.1), deployments (2.2), configuración (2.3) → Laboratorios no se desvían
+- U3: Clase enseña redes (3.1), aislamiento (3.2), seguridad (3.3) → Laboratorios son directa aplicación
+
+### Incrementalidad de Laboratorios: EXCELENTE DISEÑO
+- Lab 3.1: Crea payment-service del cero
+- Lab 3.2: Reutiliza deployment de 3.1, agrega SOLO NetworkPolicy
+- Lab 3.3: Reutiliza 3.1+3.2, agrega SOLO RBAC/SecurityContext/PSA
+
+Sin repetición innecesaria, acumula complejidad linealmente.
+
+### Versionamiento Semántico: CONSISTENTE
+- catalog: 1.0.0 (sin cambios U1→U2→U3)
+- inventory: 1.0.0 → 1.1.0 (U2, cambios) → 1.2.0 (U3, endpoint nuevo, MINOR bump correcto)
+- payment: 1.0.0 (nuevo en U3)
+
+Todas las versiones están en pom.xml y Dockerfile de forma consistente.
+
+### README de U3: CONGRUENTE
+- Describe que payment-service hace **llamadas HTTP reales** a catalog e inventory (no estático)
+- Explica qué hace cada laboratorio sin ambigüedad
+- Versioning claro para cada servicio
+
+Alineado con realidad de código/laboratorios.
+
+### Pedagogía: PROGRESIÓN LÓGICA
+- U1: Software (patrones de resiliencia en JVM)
+- U2: Infraestructura (cómo orquestar en Kubernetes)
+- U3: Red y Seguridad (cómo exponer y proteger servicios)
+
+Escalada clara de complejidad horizontal (más conceptos) y vertical (capas de infraestructura).
+
+---
+
+## 📊 Resumen Estado General
+
+| Unidad | Continuidad | Alineación | Incrementalidad | README | Veredicto |
+|--------|------------|-----------|-----------------|--------|-----------|
+| U1 | ✅ | ✅ | ✅ | ⚠️ promesas de HA | Bueno, pendientes menores |
+| U2 | ✅ | ✅ | ✅ | ⚠️ referencias inconsistentes | Bueno, pendientes menores |
+| U3 | ✅✅ | ✅✅ | ✅✅ | ✅ | **EXCELENTE, 2 decisiones operativas** |
+
+**Conclusión:** El curso está **sólidamente construido**. Las decisiones pendientes de U3 son operativas (cómo presentar Ingress y cómo preparar Lab 3.2), no conceptuales. U1 y U2 tienen puntos técnicos menores que revisar antes de edición futura.

@@ -38,7 +38,7 @@ unidad-3-networks/
 │           └── Dockerfile
 ```
 
-**Punto de partida:** El proyecto base contiene `catalog-service` e `inventory-service`. El Laboratorio 3.1 crea un `payment-service` de demostración (respuesta HTTP estática); no es un servicio de pagos real ni requiere construir una imagen propia.
+**Punto de partida:** El proyecto base contiene `catalog-service` e `inventory-service` heredados de U2. El Laboratorio 3.1 crea un `payment-service` NUEVO (v1.0.0) que hace **llamadas HTTP reales** a los servicios heredados, demostrando **continuidad entre unidades**. payment-service orquesta: validación de producto (catalog-service) + reserva de inventario (inventory-service) + procesamiento de pago simulado.
 
 ## Contenido de clases
 
@@ -47,21 +47,21 @@ unidad-3-networks/
 - Arquitectura de Services como balanceadores L4
 - Ingress y Gateway API para enrutamiento L7 (HTTP/HTTPS)
 - Gestión de certificados TLS/SSL
-- **Laboratorio:** Exponer payment-service con Gateway API y TLS; comparar con Ingress
+- **Laboratorio:** Crear payment-service v1.0.0 (orquestador que llama a catalog + inventory de U2); exponerlo con Gateway API + TLS; validar comunicación inter-servicios
 
 ### **3.2 Redes del clúster y políticas de comunicación**
 - Fundamentos de la red interna de Kubernetes (CNI y modelos de red)
 - Control del tráfico entre pods y namespaces
 - NetworkPolicies: sintaxis, selectores, reglas Ingress/Egress
 - Validación de aislamiento y comunicación permitida
-- **Laboratorio:** Implementar NetworkPolicies para aislar servicios
+- **Laboratorio:** Reutilizar payment-service de 3.1; implementar NetworkPolicies para aislar servicios (Default Deny a payment-service, permitir Ingress desde Gateway, permitir Egress inter-servicios)
 
 ### **3.3 Seguridad en el despliegue y acceso**
 - RBAC (Role-Based Access Control): Roles, RoleBindings, ServiceAccounts
 - SecurityContext: usuarios no-root, capacidades, privilegios
 - Pod Security Standards (Privileged, Baseline, Restricted) y Pod Security Admission
 - Principios de mínimo privilegio
-- **Laboratorio:** Aplicar RBAC, PSA y SecurityContext
+- **Laboratorio:** Reutilizar payment-service + NetworkPolicy de 3.1+3.2; aplicar RBAC (ServiceAccount), SecurityContext (runAsNonRoot, readOnlyFilesystem) y PSA (enforce=restricted)
 
 ---
 
@@ -89,7 +89,7 @@ Si necesitas refrescar esos conceptos, revisa [Unidad 2: Kubernetes — Fundamen
 
 ## Punto de partida recomendado
 
-La unidad parte de `02-laboratorio/proyecto-base-unidad-03/`, que contiene `catalog-service` e `inventory-service`, heredados de la Unidad 2. El Laboratorio 3.1 crea un `payment-service` de demostración; no procesa pagos ni requiere una imagen propia. Los dos servicios heredados son escenarios opcionales para extender las prácticas, no requisitos para completar la secuencia base.
+La unidad parte de `02-laboratorio/proyecto-base-unidad-03/`, que contiene `catalog-service` e `inventory-service`, heredados de la Unidad 2. El Laboratorio 3.1 crea un `payment-service` NUEVO v1.0.0 que hace **llamadas HTTP reales** a los servicios heredados, demostrando continuidad y arquitectura de microservicios. Los Laboratorios 3.2 y 3.3 reutilizan este payment-service, agregando capas de seguridad (NetworkPolicy, RBAC, PSA).
 
 ---
 

@@ -1,77 +1,193 @@
-# **Laboratorio 3.2:** Aislamiento de Red con NetworkPolicy
+# Laboratorio de la clase 3.2: Aislamiento de Red con NetworkPolicy
 
-Aplicar aislamiento de red a los Pods seleccionados con una política de denegación predeterminada y reglas explícitas para los flujos necesarios. Este laboratorio trabaja con `NetworkPolicy`; no implementa por sí solo una arquitectura Zero Trust.
+## Objetivo del laboratorio y escenario real
 
----
+**El escenario:** Completaste Lab 3.1 con los 3 servicios **ya desplegados en namespace `default`**:
+- `catalog-service:1.0.0` (2 replicas)
+- `inventory-service:1.2.0` (2 replicas)
+- `payment-service:1.0.0` (2 replicas) + Envoy Gateway (HTTPS validado)
 
-## 🎯 Objetivo
+Sin embargo, en la red actual **todos los Pods se comunican libremente** entre sí. Cualquier Pod podría acceder a cualquier otro sin restricción (principio de *Default Allow*).
 
-Aplicar políticas de red L3/L4 en el namespace `production` para aislar los Pods seleccionados en las direcciones `Ingress` y `Egress`, y permitir el tráfico requerido desde el proxy de datos de Envoy Gateway y, opcionalmente, entre servicios. La aplicación de las políticas depende de que el CNI del clúster las soporte.
+Ahora necesitas:
+1. Aplicar una política de **denegación predeterminada** a payment-service (`Default Deny`)
+2. Permitir tráfico **solo desde Envoy Gateway** (Ingress) e **inter-servicios** (Egress: payment → catalog, payment → inventory)
+3. Validar que las políticas realmente bloquean tráfico no autorizado
 
----
+**El objetivo:** Implementar aislamiento L3/L4 con `NetworkPolicy`, demostrando el principio de **mínimo privilegio en red**.
 
-## 📋 Requisitos Previos
-
-- **Laboratorio 3.1 completado:** Gateway API + TLS desplegado
-- **Clúster con CNI:** El mismo clúster compatible con Envoy Gateway del Laboratorio 3.1 y con soporte efectivo para NetworkPolicies (Calico, Cilium, etc.).
-- **kubectl:** versión compatible con el API Server del clúster.
-- **Namespace:** production (creado en Lab 3.1)
-- **Servicio requerido:** `payment-service` activo. `catalog-service` e `inventory-service` se necesitan solo si se realiza la prueba interservicios opcional y están desplegados en `production`.
-
----
-
-## 🚀 Punto de Partida
-
-Del Lab 3.1:
-- ✅ payment-service de demostración desplegado y accesible vía Gateway API + TLS
-- ⏳ catalog-service e inventory-service opcionales para probar reglas interservicios
-- ⏳ Sin restricciones de red (todos los Pods se comunican libremente)
+**Salida esperada:** Los 3 servicios siguen funcionando (payment-service orquesta llamadas a catalog e inventory), pero tráfico no autorizado es bloqueado por el CNI.
 
 ---
 
-## 📝 Pasos del Laboratorio
+## 📋 Requisitos previos
 
-### Paso 1: Verificar que CNI soporta NetworkPolicies
+**🔗 Continuidad:** Este laboratorio es la **continuación directa de Lab 3.1**. Asume que:
+- ✅ Lab 3.1 está **completamente terminado**
+- ✅ Los 3 servicios están corriendo en namespace `default`
+- ✅ Envoy Gateway está instalado y funcional
+- ✅ HTTPS está validado (certificado autofirmado)
+- ✅ Todos los Pods están en estado `Running`
 
-#### Linux y macOS
+**Verificar estado actual antes de continuar:**
 
 ```bash
-# Inspeccionar los Pods del sistema para identificar el CNI instalado
-kubectl get pods -n kube-system -o wide
+# Confirmar que los 3 servicios están corriendo en default
+kubectl get pods -l app=catalog-service -o wide
+kubectl get pods -l app=inventory-service -o wide
+kubectl get pods -l app=payment-service -o wide
 
-# Verificar API de NetworkPolicy está disponible
+# Confirmar que los Services existen
+kubectl get services
+
+# Confirmar que Envoy Gateway está activo
+kubectl get pods -n envoy-gateway-system
+kubectl get gateways
+```
+
+**Si todos los comandos anteriores muestran recursos activos, estás listo para continuar. Si falta algo, completa Lab 3.1 primero.**
+
+---
+
+## 📝 Requisitos técnicos adicionales
+
+- Clúster con **CNI que soporte NetworkPolicy** (Calico, Cilium, Weave, Flannel con plugin, etc.)
+- Minikube: debes tener habilitado el addon: `minikube addons enable network-policy`
+- `kubectl` y acceso administrativo al clúster
+
+**Nota pedagógica:** NetworkPolicy es **solo especificación**. El CNI es responsable de implementarla. Si el CNI no la soporta, los manifiestos se crean pero no tienen efecto en la red. En Minikube, el addon de network-policy debe estar habilitado explícitamente.
+
+---
+
+## 📝 Notas pedagógicas previas
+
+**Qué aprenderás:** 
+- Cómo aislar Pods por defecto (Deny All)
+- Cómo crear reglas explícitas (Allow List)
+- Diferencia entre `Ingress` y `Egress`
+- Cómo identificar etiquetas reales de Pods
+- Troubleshooting de conectividad red bloqueada
+
+**Por qué es importante:** Sin NetworkPolicy, un compromiso en un Pod podría acceder a todos los demás servicios. Esto es el principio de "Mínimo Privilegio" en red.
+
+---
+
+## 🚀 Pasos del laboratorio
+
+### Paso 1: Verificar que el CNI soporta NetworkPolicy
+
+**Qué hace:** Confirma que tu clúster tiene soporte para NetworkPolicy habilitado.
+
+**Por qué:** NetworkPolicy es solo especificación; el CNI debe implementarla.
+
+**En Linux/macOS:**
+
+```bash
+# Verificar que la API acepta NetworkPolicy
 kubectl api-resources | grep networkpolicies
 
-# Si usas Calico o Cilium, comprobar sus Pods
-kubectl get pods -A | grep -E "calico|cilium"
+# Verificar qué CNI está instalado
+kubectl get pods -n kube-system -o wide | grep -E "calico|cilium|weave|flannel"
+
+# En Minikube, verificar si está habilitado
+minikube addons list | grep network-policy
+
+# Si no está, habilitarlo:
+minikube addons enable network-policy
 ```
 
-#### Windows
+**En Windows (PowerShell):**
 
 ```powershell
-# Verificar soporte de NetworkPolicy
-kubectl api-resources | Select-String "networkpolic"
+# Verificar API
+kubectl api-resources | Select-String "networkpolicies"
 
-# Identificar los Pods del CNI instalado
-kubectl get pods -A -o wide
+# Verificar CNI
+kubectl get pods -n kube-system -o wide
+
+# En Minikube
+minikube addons list | Select-String "network-policy"
+
+# Habilitar si es necesario
+minikube addons enable network-policy
 ```
 
-**Esperado:** La API `networkpolicies.networking.k8s.io` está disponible y puedes identificar el CNI instalado. Que la API acepte objetos `NetworkPolicy` no confirma por sí solo que el CNI aplique sus reglas; lo validarás con las pruebas de conectividad de este laboratorio.
+**Qué observar:**
+- `networkpolicies.networking.k8s.io` debe aparecer en la salida
+- Un Pod de CNI (calico-node, cilium-agent, etc.) debe estar ejecutándose en kube-system
+
+**Nota:** La presencia de la API no significa que el CNI la implemente. Validarás esto con las pruebas reales.
 
 ---
 
-### Paso 2: Aislar `payment-service` por defecto
+### Paso 2: Inspeccionar etiquetas actuales de Pods
 
-Crea el archivo `02-default-deny-payment.yaml`:
+**Qué hace:** Identifica qué etiquetas tienen los Pods para usar en las políticas.
 
-```yaml
+**Por qué:** NetworkPolicy usa `podSelector.matchLabels` para elegir Pods. Necesitas saber las etiquetas REALES.
+
+**En Linux/macOS:**
+
+```bash
+# Ver todos los Pods de production con sus etiquetas
+kubectl get pods -n production --show-labels
+
+# Ver etiquetas específicas de payment-service
+kubectl get pods -n production -l app=payment-service --show-labels
+
+# Ver etiquetas de Envoy Gateway proxy (datos)
+kubectl get pods -n envoy-gateway-system --show-labels | head -20
+
+# Identifica cuál es el Pod que maneja tráfico (busca "envoy" en el nombre)
+# Generalmente es "envoy-xxxxx" en el namespace envoy-gateway-system
+PROXY_POD=$(kubectl get pods -n envoy-gateway-system -o jsonpath='{.items[0].metadata.name}')
+echo "Proxy Pod: $PROXY_POD"
+
+# Ver etiquetas EXACTAS del proxy
+kubectl get pod $PROXY_POD -n envoy-gateway-system -o yaml | grep -A 20 "labels:"
+```
+
+**En Windows (PowerShell):**
+
+```powershell
+kubectl get pods -n production --show-labels
+
+kubectl get pods -n production -l app=payment-service --show-labels
+
+kubectl get pods -n envoy-gateway-system --show-labels | Select-Object -First 20
+
+# Guardar etiquetas del proxy para usarlas después
+$PROXY_POD = kubectl get pods -n envoy-gateway-system -o jsonpath='{.items[0].metadata.name}'
+Write-Host "Proxy Pod: $PROXY_POD"
+
+kubectl get pod $PROXY_POD -n envoy-gateway-system -o yaml | Select-String -Context 0,20 "labels:"
+```
+
+**Qué observar:**
+- Pods de payment-service deben tener `app: payment-service`
+- Pods de catalog-service deben tener `app: catalog-service`
+- Pods de inventory-service deben tener `app: inventory-service`
+- El proxy de Envoy debe tener etiquetas identificables (probablemente `app: envoy` o similar)
+
+**Nota pedagógica:** Estos labels vinieron de tus manifiestos K8s de Lab 3.1. Son arbitrarios pero consistentes.
+
 ---
-# Aísla los Pods de payment-service para Ingress y Egress.
-# Los demás Pods del namespace no quedan seleccionados por esta política.
+
+### Paso 3: Crear política Default Deny para payment-service
+
+**Qué hace:** Aísla completamente payment-service (bloquea Ingress y Egress).
+
+**Por qué:** Comienza con "bloquear todo", luego abre explícitamente lo necesario (Whitelist).
+
+**En Linux/macOS:**
+
+```bash
+# Crear archivo de política
+cat > payment-deny-all.yaml << 'EOFILE'
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: default-deny-payment
+  name: payment-deny-all
   namespace: production
 spec:
   podSelector:
@@ -80,53 +196,128 @@ spec:
   policyTypes:
   - Ingress
   - Egress
-```
+  # Intencionalmente vacío: niega TODO
+EOFILE
 
-Aplica la política:
+# Aplicar política
+kubectl apply -f payment-deny-all.yaml
 
-```bash
-# Linux y macOS
-kubectl apply -f 02-default-deny-payment.yaml
-
-# Windows PowerShell
-kubectl apply -f 02-default-deny-payment.yaml
-```
-
-Verifica:
-
-```bash
+# Verificar
 kubectl get networkpolicy -n production
-kubectl describe networkpolicy default-deny-payment -n production
+kubectl describe networkpolicy payment-deny-all -n production
 ```
 
-**Resultado esperado:** 
-- NetworkPolicy `default-deny-payment` creada
-- Todos los Pods etiquetados `app: payment-service` quedan aislados para `Ingress` y `Egress`, salvo las respuestas de conexiones permitidas y las excepciones propias de la implementación de red. Otros Pods del namespace no quedan seleccionados por esta política.
-- Las conexiones afectadas dejan de funcionar. El síntoma visible (por ejemplo, timeout o error HTTP) depende del CNI y del punto donde se aplique el bloqueo; no se garantiza un HTTP 502.
+**En Windows (PowerShell):**
 
----
-
-### Paso 3: Identificar el proxy de datos y permitir su tráfico a payment-service
-
-La política debe seleccionar los **Pods del proxy de datos** de Envoy Gateway, no asumir que estos están en el namespace del controlador. Identifica el Pod que maneja el tráfico y sus etiquetas reales:
-
-```bash
-kubectl get pods -A -o wide | grep -i envoy
-kubectl get pods -n envoy-gateway-system --show-labels
-```
-
-Si el Pod de datos no está en `envoy-gateway-system`, sustituye ese namespace en el manifiesto. El `podSelector` del ejemplo contiene marcadores: reemplázalos por una etiqueta estable que comparta el proxy de datos antes de aplicar el archivo. El selector de namespace y el de Pod dentro del mismo elemento `from` se combinan con AND.
-
-Crea el archivo `03-allow-ingress-to-payment.yaml`:
-
-```yaml
----
-# Permite tráfico desde los Pods proxy de datos identificados.
-# Reemplaza los marcadores del selector por una etiqueta real antes de aplicar.
+```powershell
+# Crear archivo (o editar en VS Code)
+$policy = @'
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-ingress-to-payment
+  name: payment-deny-all
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: payment-service
+  policyTypes:
+  - Ingress
+  - Egress
+'@
+
+$policy | Out-File -FilePath payment-deny-all.yaml -Encoding UTF8
+
+kubectl apply -f payment-deny-all.yaml
+
+kubectl get networkpolicy -n production
+kubectl describe networkpolicy payment-deny-all -n production
+```
+
+**Qué observar:**
+- NetworkPolicy creada sin errores
+- `policyTypes` contiene `Ingress` y `Egress`
+- Sin `ingress` o `egress` rules definidas = denegar TODO
+
+**Nota pedagógica:** En este punto, payment-service **NO PUEDE** hablar con nada:
+- No recibe conexiones de Envoy (Ingress bloqueado)
+- No puede llamar a catalog/inventory (Egress bloqueado)
+- No puede resolver DNS (Egress a puerto 53 bloqueado)
+
+---
+
+### Paso 4: Probar que payment-service está aislado
+
+**Qué hace:** Valida que la política está bloqueando tráfico.
+
+**Por qué:** Confirmar que el CNI realmente implementa NetworkPolicy.
+
+**Desde Lab 3.1, si todavía tienes port-forward activo:**
+
+```bash
+# Intentar acceder a payment-service vía HTTPS
+# Debería FALLAR (timeout o Connection refused)
+curl --cacert payment.crt \
+  --resolve payment.local:8443:127.0.0.1 \
+  -i https://payment.local:8443/v1/payments \
+  --max-time 5
+
+# Si tienes timeout o "Connection refused" → ¡PolicyWorking!
+```
+
+**Alternativa (ejecutar desde un Pod autorizado por ahora):**
+
+```bash
+# Acceder desde Pod en production (que NO será payment-service)
+kubectl run test-access \
+  --image=curlimages/curl:latest \
+  --namespace production \
+  --labels app=test-client \
+  --restart=Never \
+  --rm -it \
+  -- curl -v --connect-timeout 3 http://payment-service:8080/v1/payments
+```
+
+**Qué observar:**
+- Curl devuelve timeout o error de conexión (es lo esperado)
+- El timeout típicamente es ~5 segundos
+
+**Nota pedagógica:** Si FUNCIONA y recibe respuesta JSON, significa:
+- El CNI no está aplicando NetworkPolicy, O
+- Hay otra política permitiendo el tráfico
+
+En ese caso, verifica con tu proveedor de CNI que esté correctamente habilitado.
+
+---
+
+### Paso 5: Permitir Ingress desde Envoy Gateway
+
+**Qué hace:** Abre un "agujero" en la política para que Envoy pueda alcanzar payment-service.
+
+**Por qué:** payment-service debe ser accesible desde el proxy de Gateway API.
+
+**Primero, identifica las etiquetas exactas del proxy (si no las anotaste en Paso 2):**
+
+```bash
+# Linux/macOS
+ENVOY_POD=$(kubectl get pods -n envoy-gateway-system -o jsonpath='{.items[0].metadata.name}')
+kubectl get pod $ENVOY_POD -n envoy-gateway-system -o yaml | grep -A 5 "labels:"
+
+# Windows
+$ENVOY_POD = kubectl get pods -n envoy-gateway-system -o jsonpath='{.items[0].metadata.name}'
+kubectl get pod $ENVOY_POD -n envoy-gateway-system -o yaml | Select-String -Context 0,5 "labels:"
+```
+
+Anota las etiquetas clave (típicamente `app: envoy` o `gateway.envoyproxy.io/owned-by: <gateway-name>`).
+
+**Crear política Allow Ingress:**
+
+```bash
+cat > allow-payment-ingress.yaml << 'EOFILE'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-payment-ingress
   namespace: production
 spec:
   podSelector:
@@ -141,86 +332,182 @@ spec:
           kubernetes.io/metadata.name: envoy-gateway-system
       podSelector:
         matchLabels:
-          REEMPLAZAR_CLAVE_LABEL: REEMPLAZAR_VALOR_LABEL
+          app: envoy  # AJUSTA ESTA ETIQUETA si tu Pod tiene otra
     ports:
     - protocol: TCP
       port: 8080
+EOFILE
+
+kubectl apply -f allow-payment-ingress.yaml
+
+kubectl describe networkpolicy allow-payment-ingress -n production
 ```
 
-Aplica la política:
+**En Windows:**
 
-```bash
-kubectl apply -f 03-allow-ingress-to-payment.yaml
+```powershell
+$policy = @'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-payment-ingress
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: payment-service
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: envoy-gateway-system
+      podSelector:
+        matchLabels:
+          app: envoy
+    ports:
+    - protocol: TCP
+      port: 8080
+'@
+
+$policy | Out-File -FilePath allow-payment-ingress.yaml -Encoding UTF8
+
+kubectl apply -f allow-payment-ingress.yaml
+
+kubectl describe networkpolicy allow-payment-ingress -n production
 ```
 
-Verifica:
+**Qué observar:**
+- NetworkPolicy creada sin errores
+- El `from` combina `namespaceSelector` AND `podSelector` (ambas condiciones deben cumplirse)
+- Puerto 8080 es el que escucha payment-service
+
+**Nota pedagógica:** Si el Pod proxy NO tiene etiqueta `app: envoy`, la política no coincidirá y Envoy seguirá sin poder acceder. Verifica las etiquetas exactas.
+
+---
+
+### Paso 6: Permitir Egress para DNS
+
+**Qué hace:** Abre puerto 53 (DNS) para que payment-service resuelva nombres.
+
+**Por qué:** Sin DNS, `catalog-service` y `inventory-service` no se resuelven (necesita llamar a CoreDNS).
 
 ```bash
+cat > allow-payment-dns.yaml << 'EOFILE'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-payment-dns
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: payment-service
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+EOFILE
+
+kubectl apply -f allow-payment-dns.yaml
+
 kubectl get networkpolicy -n production
-kubectl get gateway,httproute -n production
 ```
 
-**Esperado:** 
-- NetworkPolicy creada
-- El CNI permite el tráfico entrante desde el namespace indicado al puerto 8080 de los Pods seleccionados de `payment-service`. Si el proxy de datos usa otro namespace, corrige el selector antes de aplicar la política.
-- Una solicitud a un endpoint válido de payment-service debe volver a funcionar; verifica el código HTTP y el cuerpo que devuelve la aplicación.
-- `curl --cacert checkout.crt --resolve checkout.local:8443:127.0.0.1 https://checkout.local:8443/v1/payment` funciona nuevamente
+**En Windows:**
 
----
-
-### Paso 4: Permitir Comunicación Inter-Servicios (Opcional pero Recomendado)
-
-El backend de demostración del Laboratorio 3.1 no llama a otros servicios. Esta sección es un ejercicio opcional de políticas: despliega `catalog-service` e `inventory-service` con imágenes disponibles en el namespace `production`, o sáltala. Para permitir un flujo real entre servicios, se deben habilitar tanto el `Ingress` del destino como el `Egress` del origen. En este ejemplo, los tres servicios están en `production` y escuchan en el puerto 8080 del Pod. Ajusta etiquetas y puertos si tus manifiestos usan otros valores.
-
-Crea el archivo `04-allow-inter-service.yaml`:
-
-```yaml
----
-# Permite que payment-service llame a catalog-service
+```powershell
+$policy = @'
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-payment-to-catalog
+  name: allow-payment-dns
   namespace: production
 spec:
   podSelector:
     matchLabels:
-      app: catalog-service
+      app: payment-service
   policyTypes:
-  - Ingress
-  ingress:
-  - from:
-    - podSelector:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
         matchLabels:
-          app: payment-service
+          kubernetes.io/metadata.name: kube-system
     ports:
+    - protocol: UDP
+      port: 53
     - protocol: TCP
-      port: 8080
+      port: 53
+'@
+
+$policy | Out-File -FilePath allow-payment-dns.yaml -Encoding UTF8
+
+kubectl apply -f allow-payment-dns.yaml
+
+kubectl get networkpolicy -n production
+```
+
+**Qué observar:**
+- Permite Egress a `kube-system` en puerto 53 (UDP y TCP)
+- Sin esto, `catalog-service:80` no resolvería a IP
 
 ---
-# Permite que payment-service llame a inventory-service
+
+### Paso 7: Permitir Egress inter-servicios (opcional pero recomendado)
+
+**Qué hace:** Abre connection desde payment-service hacia catalog e inventory.
+
+**Por qué:** Si payment-service orquesta llamadas a otros servicios, las necesita.
+
+```bash
+cat > allow-payment-egress.yaml << 'EOFILE'
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-payment-to-inventory
+  name: allow-payment-egress-to-services
   namespace: production
 spec:
   podSelector:
     matchLabels:
-      app: inventory-service
+      app: payment-service
   policyTypes:
-  - Ingress
-  ingress:
-  - from:
+  - Egress
+  egress:
+  # Permitir a catalog-service
+  - to:
     - podSelector:
         matchLabels:
-          app: payment-service
+          app: catalog-service
     ports:
     - protocol: TCP
       port: 8080
+  # Permitir a inventory-service
+  - to:
+    - podSelector:
+        matchLabels:
+          app: inventory-service
+    ports:
+    - protocol: TCP
+      port: 8080
+EOFILE
 
----
-# Permite a payment-service iniciar conexiones hacia catalog-service e inventory-service
+kubectl apply -f allow-payment-egress.yaml
+```
+
+**En Windows:**
+
+```powershell
+$policy = @'
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -247,257 +534,249 @@ spec:
     ports:
     - protocol: TCP
       port: 8080
+'@
+
+$policy | Out-File -FilePath allow-payment-egress.yaml -Encoding UTF8
+
+kubectl apply -f allow-payment-egress.yaml
 ```
 
-Aplica:
-
-```bash
-kubectl apply -f 04-allow-inter-service.yaml
-```
+**Qué observar:**
+- Dos bloques `to:` para dos servicios diferentes
+- Ambos al puerto 8080 (el puerto del Pod, no el Service)
 
 ---
 
-### Paso 5: Permitir DNS (Necesario para nombre.namespace.svc.cluster.local)
+### Paso 8: Validar que payment-service vuelve a funcionar
 
-Para que los servicios puedan resolver nombres DNS, permitir tráfico a kube-dns:
+**Qué hace:** Confirma que después de permitir tráfico, todo funciona.
 
-Crea el archivo `05-allow-dns.yaml`:
+**Por qué:** Asegurarse que las políticas son efectivas y consistentes.
 
-```yaml
----
-# Permite que payment-service consulte Pods de kube-system
-# en el puerto DNS (UDP y TCP 53).
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-dns
-  namespace: production
-spec:
-  podSelector:
-    matchLabels:
-      app: payment-service
-  policyTypes:
-  - Egress
-  egress:
-  # Permitir DNS a kube-dns
-  - to:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: kube-system
-    ports:
-    - protocol: UDP
-      port: 53
-    - protocol: TCP
-      port: 53
-```
-
-Esta regla permite el puerto 53 a los Pods de `kube-system`, no exclusivamente a CoreDNS. Para restringirla, comprueba las etiquetas reales de los Pods DNS en tu clúster y añade un `podSelector` junto al `namespaceSelector`. Algunos clústeres usan NodeLocal DNS; en ese caso, adapta la regla a la arquitectura DNS y al CNI instalados.
-
-Aplica:
+**Con port-forward de Lab 3.1 activo:**
 
 ```bash
-kubectl apply -f 05-allow-dns.yaml
+# Test HTTPS vía Gateway
+curl --cacert payment.crt \
+  --resolve payment.local:8443:127.0.0.1 \
+  -i https://payment.local:8443/v1/payments \
+  -H "Content-Type: application/json" \
+  -d '{"productId":"PROD-003","quantity":1,"amount":29.99}'
+
+# Esperado: JSON con transactionId, status (APPROVED o DECLINED)
 ```
+
+**Alternativa (ejecutar desde otro Pod):**
+
+```bash
+kubectl exec -it deployment/payment-service -n production -- \
+  curl -i http://inventory-service:80/v1/inventory
+```
+
+**Qué observar:**
+- Respuesta HTTP exitosa
+- Status de pago (APPROVED ~90%, DECLINED ~10% por diseño)
 
 ---
 
-### Paso 6: Probar Aislamiento de Red
+### Paso 9: Probar que tráfico no autorizado está bloqueado
 
-#### Test 1: Tráfico permitido (desde Gateway a payment-service)
+**Qué hace:** Confirma que un Pod en otro namespace NO puede alcanzar payment-service.
 
-```bash
-# Conserva el port-forward al Service proxy creado por Envoy Gateway (Lab 3.1).
-# En otra terminal:
-curl --cacert checkout.crt \
-  --resolve checkout.local:8443:127.0.0.1 \
-  -i https://checkout.local:8443/v1/payment
-```
-
-**Resultado esperado:** Una respuesta HTTP válida del endpoint `/v1/payment`. El código y el cuerpo deben coincidir con la implementación de `payment-service`.
-
----
-
-#### Test 2: Tráfico bloqueado (desde Pod no autorizado)
+**Por qué:** Validar que la política realmente aísla.
 
 ```bash
-# Intentar conectarse desde Pod en namespace 'default' (no autorizado)
+# Crear Pod en namespace 'default' (no production)
 kubectl run unauthorized-client \
-  --image=curlimages/curl \
+  --image=curlimages/curl:latest \
   --namespace default \
-  --rm -it \
   --restart=Never \
-  -- curl --fail --connect-timeout 5 -v http://payment-service.production.svc.cluster.local/v1/payment
+  --rm -it \
+  -- curl -v --connect-timeout 5 http://payment-service.production.svc.cluster.local:8080/v1/payments
+
+# Esperado: timeout o "Connection refused"
 ```
 
-**Resultado esperado:** La solicitud no obtiene una respuesta HTTP exitosa de payment-service. El error concreto depende del CNI; no se garantiza que sea un timeout. Si no resuelve el nombre DNS, revisa también el Paso 5.
+**En Windows (PowerShell):**
+
+```powershell
+kubectl run unauthorized-client `
+  --image=curlimages/curl:latest `
+  --namespace default `
+  --restart=Never `
+  --rm -it `
+  -- curl -v --connect-timeout 5 http://payment-service.production.svc.cluster.local:8080/v1/payments
+```
+
+**Qué observar:**
+- La conexión NO se establece (timeout típicamente ~5 segundos)
+- El CNI está bloqueando en la capa de red
 
 ---
 
-#### Test 3: Tráfico entre servicios (si aplicaste el Paso 4)
+### Paso 10: Listar y exportar políticas
+
+**Qué hace:** Documenta todas las políticas aplicadas.
+
+**Por qué:** Necesarias para auditoría, backup y documentación.
 
 ```bash
-# Simula un Pod de payment-service para probar las reglas de Egress e Ingress.
-# Ejecuta en production con la etiqueta seleccionada por las políticas.
-kubectl run payment-policy-test \
-  --image=curlimages/curl \
-  --namespace production \
-  --labels app=payment-service \
-  --rm -it \
-  --restart=Never \
-  -- curl --connect-timeout 5 -i http://catalog-service:8080/v1/products
-
-# El Service de inventory-service expone el puerto 80 y lo dirige al 8080 del Pod.
-kubectl run payment-policy-test \
-  --image=curlimages/curl \
-  --namespace production \
-  --labels app=payment-service \
-  --rm -it \
-  --restart=Never \
-  -- curl --connect-timeout 5 -i http://inventory-service/v1/inventory
-```
-
-**Resultado esperado:** Si aplicaste las políticas del Paso 4 y el DNS del Paso 5 está permitido, ambas conexiones deben llegar a sus servicios. El catálogo puede responder según su lógica de aplicación; inventario debe responder con su estado. Si omitiste el Paso 4, no se permite el flujo de `payment-service` a esos servicios. El resultado específico al denegarlo depende del CNI. Comprueba también que las rutas HTTP sean válidas en cada aplicación.
-
----
-
-### Paso 7: Auditoría de Políticas Aplicadas
-
-Listar todas las políticas:
-
-```bash
-# Ver todas las NetworkPolicies
+# Ver todas las policies
 kubectl get networkpolicy -n production
 
-# Ver detalles de cada una
-kubectl describe networkpolicy -n production
+# Ver detalles completos
+kubectl get networkpolicy -n production -o yaml
 
-# Exportar a YAML (para documentación)
-kubectl get networkpolicy -n production -o yaml > networkpolicies-backup.yaml
+# Exportar a archivo
+kubectl get networkpolicy -n production -o yaml > production-networkpolicies.yaml
+
+# Listar en formato tabla
+kubectl get networkpolicy -n production -o wide
 ```
+
+**Qué observar:**
+- Al menos 4 políticas: `payment-deny-all`, `allow-payment-ingress`, `allow-payment-dns`, `allow-payment-egress-to-services`
+- Todas en namespace `production`
 
 ---
 
-## 🔍 Guía de Troubleshooting
+## 🔍 Troubleshooting
 
-### Problema 1: Envoy Gateway no alcanza payment-service después de aislarlo
+### Problema 1: "Tráfico sigue funcionando aunque aplicué Deny All"
 
-**Síntomas:** La solicitud a través de Gateway API falla (por ejemplo, con HTTP 502 o timeout).
-
-**Posibles causas:** No aplicaste la NetworkPolicy `allow-ingress-to-payment`, el selector no coincide con las etiquetas del Pod, el puerto destino no es 8080 o el CNI no aplica políticas de red.
+**Causa:** El CNI no está aplicando NetworkPolicy. Es común en:
+- Minikube sin `network-policy` addon habilitado
+- Clúster Kind sin CNI que soporte NetworkPolicy
 
 **Solución:**
 
 ```bash
-# Verificar que la política existe
-kubectl get networkpolicy -n production
+# En Minikube
+minikube addons enable network-policy
+minikube ssh sudo sysctl -w net.ipv4.conf.all.forward=1
+
+# En Kind, necesitas instalar CNI como Calico
+kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/tigera-operator.yaml
+
+# Espera a que el CNI esté listo
+kubectl get pods -n calico-system
+kubectl get pods -n kube-system | grep calico
+```
+
+---
+
+### Problema 2: "La etiqueta del proxy no coincide"
+
+**Causa:** Usaste una etiqueta incorrecta en `podSelector` de la política.
+
+**Solución:**
+
+```bash
+# Inspecciona exactamente las etiquetas del proxy
+kubectl get pods -n envoy-gateway-system -o yaml | grep -A 20 "labels:"
+
+# Copia la EXACT etiqueta clave-valor
+# Ejemplo si ves: "app: envoy" o "gateway.envoyproxy.io/owned-by: payment-gateway"
+
+# Actualiza el archivo allow-payment-ingress.yaml con la etiqueta correcta
+kubectl apply -f allow-payment-ingress.yaml
+
+# Verifica que ahora coincida
+kubectl get networkpolicy allow-payment-ingress -n production -o yaml | grep -A 10 "podSelector:"
+```
+
+---
+
+### Problema 3: "DNS no funciona"
+
+**Síntomas:** Errores como `getaddrinfo failed: Name or service not known` en payment-service cuando llama a catalog-service.
+
+**Causa:** No permitiste tráfico Egress a puerto 53.
+
+**Solución:**
+
+```bash
+# Verificar que la política DNS existe
+kubectl get networkpolicy allow-payment-dns -n production
 
 # Si no existe, aplicarla
-kubectl apply -f 03-allow-ingress-to-payment.yaml
+kubectl apply -f allow-payment-dns.yaml
 
-# Identificar y revisar logs de los Pods proxy de datos de Envoy Gateway
-kubectl get pods -A -o wide | grep -i envoy
-kubectl logs -n NAMESPACE_DEL_PROXY POD_DEL_PROXY
-```
-
----
-
-### Problema 2: Los servicios no pueden resolver nombres DNS
-
-**Síntomas:** El nombre del Service no resuelve desde un Pod de `production`.
-
-**Posibles causas:** No aplicaste la política `allow-dns`, el selector no coincide con los Pods DNS o el clúster usa una arquitectura DNS que requiere otra regla.
-
-**Solución:**
-
-```bash
-# Aplicar allow-dns
-kubectl apply -f 05-allow-dns.yaml
-
-# El backend distroless no incluye nslookup; usa un Pod temporal seleccionado
-# por la misma política de Egress que payment-service.
+# Probar DNS desde un Pod de payment-service
 kubectl run dns-test \
-  --image=busybox:1.36.1 \
+  --image=busybox:1.35 \
   --namespace production \
   --labels app=payment-service \
-  --rm -it \
   --restart=Never \
-  -- nslookup payment-service.production.svc.cluster.local
+  --rm -it \
+  -- nslookup catalog-service.production.svc.cluster.local
 ```
 
 ---
 
-### Problema 3: Las NetworkPolicies existen, pero no se aplica el bloqueo
+## 📊 Validación Final
 
-**Síntomas:** 
-```
-NetworkPolicy creada pero tráfico no se bloquea
-```
+**Checklist de evidencia:**
 
-**Causa:** La API de Kubernetes acepta y guarda los objetos `NetworkPolicy`, pero el CNI instalado puede no aplicar sus reglas o no estar configurado para hacerlo. La presencia de la API no confirma el soporte efectivo.
+- [ ] NetworkPolicy `payment-deny-all` existe y bloquea todo
+- [ ] NetworkPolicy `allow-payment-ingress` permite acceso desde Envoy
+- [ ] NetworkPolicy `allow-payment-dns` permite resolución DNS
+- [ ] NetworkPolicy `allow-payment-egress-to-services` permite llamadas inter-servicios
+- [ ] `curl` a payment-service vía HTTPS devuelve JSON válido
+- [ ] Tráfico desde Pod en namespace `default` es bloqueado (timeout)
+- [ ] `kubectl get networkpolicy -n production` lista 4+ políticas
 
-**Solución:**
+**Comandos para documentar:**
 
-Verifica qué CNI está instalado y confirma en su documentación cómo habilitar NetworkPolicy para tu distribución y versión de Kubernetes. No instales un segundo CNI sobre un clúster activo sin seguir el procedimiento de migración recomendado para ese entorno. Después, repite los Tests 1 y 2 para comprobar que el tráfico permitido y el denegado se comportan como se espera.
-
----
-
-## 📊 Evidencia / Validación
-
-Documentar:
-
-### 1. Denegación predeterminada de `payment-service`
-```bash
-kubectl get networkpolicy -n production
-kubectl describe networkpolicy default-deny-payment -n production
-```
-
-### 2. Allow Ingress a Payment Aplicado
-```bash
-kubectl describe networkpolicy allow-ingress-to-payment -n production
-```
-
-### 3. Tráfico desde Gateway Funciona
-```bash
-curl --cacert checkout.crt \
-  --resolve checkout.local:8443:127.0.0.1 \
-  https://checkout.local:8443/v1/payment
-```
-**Screenshot esperado:** Respuesta HTTP del endpoint de payment-service. El código y el cuerpo dependen de la implementación de la aplicación.
-
-### 4. Tráfico Bloqueado desde Pod No Autorizado
-```bash
-kubectl run test-pod --image=curlimages/curl --namespace default --rm -it --restart=Never -- \
-  curl --fail --connect-timeout 3 http://payment-service.production.svc.cluster.local/v1/payment
-```
-**Screenshot esperado:** La solicitud no obtiene una respuesta HTTP exitosa. El error concreto depende del CNI.
-
-### 5. Listado de Políticas Aplicadas
 ```bash
 kubectl get networkpolicy -n production -o wide
+kubectl describe networkpolicy -n production
+kubectl logs deployment/payment-service -n production | grep -i error
+curl --cacert payment.crt https://payment.local:8443/v1/payments
 ```
 
 ---
 
 ## 🎓 Reflexión Final
 
-**Preguntas de consolidación:**
+**Preguntas de aprendizaje:**
 
-1. ¿Cuál es la diferencia entre denegar por defecto `Ingress` y `Egress`, o solo `Ingress`?
-   - Respuesta: esta política aísla los Pods seleccionados para ambas direcciones. En el laboratorio, el selector incluye solo `payment-service`; otros Pods no quedan aislados por ella. Una política que solo aísla `Ingress` deja permitido `Egress`, siempre que ninguna otra política aisle también esa dirección. Las conexiones de respuesta a flujos permitidos se admiten.
+1. **¿Qué pasaría si solo aplicaras Default Deny de Ingress, pero no de Egress?**
+   - Respuesta: payment-service no recibe conexiones, pero PUEDE iniciar conexiones salientes. Esto limita entrada pero no salida.
 
-2. ¿Por qué permitir tráfico a kube-dns (puerto 53)?
-   - Respuesta: Si el Egress está aislado, las consultas DNS también necesitan una regla de salida. DNS puede usar UDP y TCP por el puerto 53; la regla debe ajustarse a los selectores y la arquitectura DNS del clúster.
+2. **¿Por qué el selector de Envoy necesita AMBOS namespaceSelector Y podSelector?**
+   - Respuesta: Porque ambos se combinan con AND. El Pod debe estar EN envoy-gateway-system Y tener la etiqueta correcta.
 
-3. ¿Qué sucede si aplicas la denegación predeterminada a `payment-service` pero olvidas crear la política de entrada permitida?
-   - Respuesta: El tráfico desde el proxy de datos de Envoy Gateway a los Pods seleccionados no está permitido; la solicitud falla, pero el síntoma exacto depende del CNI y de la implementación del proxy.
+3. **¿Qué pasa si un Pod en production tiene la etiqueta `app: payment-service` pero NO es payment-service?**
+   - Respuesta: La política lo afectaría igual. Las etiquetas son solo identificadores; la política no valida si "realmente" es payment-service.
 
 ---
 
-## 🔗 Continuidad
+## 🔗 Continuidad con Laboratorio 3.3
 
-**Próximo paso (Laboratorio 3.3):**
-- Implementar RBAC (ServiceAccounts, Roles, RoleBindings)
-- Agregar SecurityContext (no-root, read-only filesystem)
+En el siguiente laboratorio agregarás:
+- **RBAC:** Identidad de aplicación (ServiceAccount)
+- **SecurityContext:** Ejecutar no-root, read-only filesystem
+- **Pod Security Admission:** Perfil `Restricted`
+
+NetworkPolicy + RBAC + SecurityContext = Defensa en profundidad real.
+
+---
+
+## 📚 Fuentes primarias
+
+- Kubernetes Docs: NetworkPolicy
+  - <https://kubernetes.io/docs/concepts/services-networking/network-policies/>
+- Kubernetes Docs: DNS para Servicios
+  - <https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/>
+- Calico: NetworkPolicy
+  - <https://projectcalico.docs.tigera.io/security/kubernetes-network-policy>
+- Cilium: Network Policies
+  - <https://docs.cilium.io/en/stable/security/policy/>
+
+---
+
+**Laboratorio completado cuando:** Las 4 políticas están aplicadas, payment-service es accesible desde Envoy e inter-servicios, pero bloqueado desde namespaces externos.
 - Validar que solo los Pods autorizados pueden ejecutar acciones
 
 **Relación con unidades anteriores:**
