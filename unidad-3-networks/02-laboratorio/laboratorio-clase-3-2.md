@@ -80,7 +80,7 @@ kubectl get gateways
 
 **Por qué:** NetworkPolicy es solo especificación; el CNI debe implementarla.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 # Verificar que la API acepta NetworkPolicy
@@ -96,7 +96,7 @@ minikube addons list | grep network-policy
 minikube addons enable network-policy
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 # Verificar API
@@ -126,7 +126,7 @@ minikube addons enable network-policy
 
 **Por qué:** NetworkPolicy usa `podSelector.matchLabels` para elegir Pods. Necesitas saber las etiquetas REALES.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 # Ver todos los Pods de production con sus etiquetas
@@ -147,7 +147,7 @@ echo "Proxy Pod: $PROXY_POD"
 kubectl get pod $PROXY_POD -n envoy-gateway-system -o yaml | grep -A 20 "labels:"
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 kubectl get pods -n production --show-labels
@@ -481,7 +481,7 @@ kubectl run unauthorized-client \
 # Esperado: timeout o "Connection refused"
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 kubectl run unauthorized-client `

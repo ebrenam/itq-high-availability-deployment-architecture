@@ -43,7 +43,7 @@
 
 **Por qué:** Necesitamos versiones consistentes de catalog e inventory antes de crear payment.
 
-![linux](images/linux.png) **En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 # Colócate en el directorio del proyecto base de U3
@@ -57,7 +57,7 @@ grep "<version>" catalog-service/pom.xml | head -1
 grep "<version>" inventory-service/pom.xml | head -1
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 cd unidad-3-networks/02-laboratorio/proyecto-base-unidad-03
@@ -78,7 +78,7 @@ Select-String "<version>" inventory-service/pom.xml | Select-Object -First 1
 
 **Por qué:** Semantic versioning: MINOR bump para endpoint nuevo backward-compatible.
 
-![linux](images/linux.png) **En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 # Abre el archivo pom.xml en tu editor
@@ -91,7 +91,7 @@ sed -i.bak 's/<version>1\.0\.0-SNAPSHOT<\/version>/<version>1.2.0<\/version>/' i
 grep "<version>" inventory-service/pom.xml | head -1
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 # Abre en editor y modifica manualmente, o:
@@ -170,7 +170,7 @@ Ubica el cierre de la clase (antes de la última `}`). Agrega el siguiente códi
 
 **Por qué:** payment-service necesitará llamar a esta versión con el nuevo endpoint.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 cd inventory-service
@@ -193,7 +193,7 @@ docker inspect <tu_usuario>/inventory-service:1.2.0
 cd ..
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 cd inventory-service
@@ -223,7 +223,7 @@ cd ..
 
 **Por qué:** payment-service es completamente nuevo; usamos Maven archetype para scaffolding consistente.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 cd proyecto-base-unidad-03
@@ -242,7 +242,7 @@ ls -la
 cat pom.xml | grep "<version>" | head -2
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 cd proyecto-base-unidad-03
@@ -273,7 +273,7 @@ Select-String "<version>" pom.xml | Select-Object -First 2
 
 **Por qué:** No publicamos SNAPSHOT a Docker Hub; usamos versiones semánticas estables.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 # Reemplaza version en payment-service/pom.xml
@@ -283,7 +283,7 @@ sed -i.bak 's/<version>999-SNAPSHOT<\/version>/<version>1.0.0<\/version>/' pom.x
 grep "<version>" pom.xml | head -1
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 (Get-Content pom.xml) -replace '999-SNAPSHOT', '1.0.0' | Set-Content pom.xml
@@ -435,7 +435,7 @@ quarkus.smallrye-health.root-path=/health
 
 **Por qué:** Es la versión lista para desplegar en Kubernetes.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 # Desde directorio payment-service/
@@ -457,7 +457,7 @@ curl -s "https://hub.docker.com/v2/repositories/<tu_usuario>/payment-service/tag
 cd ..
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 mvn clean package -DskipTests
@@ -607,7 +607,7 @@ kubectl get namespace production || kubectl create namespace production
 find proyecto-base-unidad-03 -name "01-deployment.yaml" -o -name "02-service.yaml" | sort
 ```
 
-**Desplegar (Linux/macOS):**
+![linux](images/linux.png) **Desplegar (Linux/macOS):**
 
 ```bash
 cd proyecto-base-unidad-03
@@ -634,7 +634,7 @@ kubectl get pods -n production -o wide
 kubectl get svc -n production
 ```
 
-**Desplegar (Windows - PowerShell):**
+![win](images/windows.png) **Desplegar (Windows - PowerShell):**
 
 ```powershell
 cd proyecto-base-unidad-03
@@ -671,7 +671,7 @@ kubectl get svc -n production
 
 **Por qué:** Validar la arquitectura antes de exponerla externamente.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 # Acceder a un Pod de payment-service
@@ -688,7 +688,7 @@ kubectl exec -it $POD_NAME -n production -- curl -X POST http://payment-service:
 # Deberías ver respuesta JSON con transactionId y status (APPROVED o FAILED)
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 $POD_NAME = kubectl get pods -n production -l app=payment-service -o jsonpath='{.items[0].metadata.name}'
@@ -715,7 +715,7 @@ kubectl exec -it $POD_NAME -n production -- curl -X POST http://payment-service:
 
 **Por qué:** Necesitamos exponerlo con TLS (HTTPS) para acceso externo.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 # Agrega repo de Helm para Envoy
@@ -739,7 +739,7 @@ kubectl get crd gateways.gateway.networking.k8s.io
 kubectl get pods -n envoy-gateway-system
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 helm repo add envoy-ai https://envoyproxy.github.io/gateway-helm
@@ -769,7 +769,7 @@ kubectl get pods -n envoy-gateway-system
 
 **Por qué:** payment-service debe estar accesible vía HTTPS externamente.
 
-**Generar certificado (Linux/macOS):**
+![linux](images/linux.png) **Generar certificado (Linux/macOS):**
 
 ```bash
 cd proyecto-base-unidad-03
@@ -913,7 +913,7 @@ kubectl describe gateway payment-gateway -n production
 
 **Por qué:** Validar que la exposición funciona end-to-end.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 # Obtener nombre del Service de Envoy proxy (creado automáticamente por Gateway)
@@ -945,7 +945,7 @@ curl --resolve payment.local:8080:127.0.0.1 \
 # kill %1
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 $ENVOY_SERVICE = kubectl get svc -n envoy-gateway-system `

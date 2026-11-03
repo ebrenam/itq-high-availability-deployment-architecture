@@ -58,7 +58,7 @@ Ahora necesitas:
 
 **Por qué:** Necesitas entender cómo cambiará para validar después.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 cd proyecto-base-unidad-03
@@ -78,7 +78,7 @@ kubectl get pods -n production -l app=payment-service \
   -o jsonpath='{.items[0].spec.serviceAccountName}'
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 cd proyecto-base-unidad-03
@@ -186,7 +186,7 @@ kubectl get serviceaccount,role,rolebinding -n production | Select-String "payme
 
 **Por qué:** Confirmar que RBAC está configurado correctamente.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 # Permiso PERMITIDO: get configmaps/payment-config
@@ -218,7 +218,7 @@ kubectl auth can-i delete pods \
 # Esperado: no
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 kubectl auth can-i get configmaps/payment-config `
@@ -290,7 +290,7 @@ kubectl patch deployment payment-service -n production \
 kubectl get deployment payment-service -n production -o yaml | grep -A 30 "securityContext:"
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 $patch = @'
@@ -344,7 +344,7 @@ kubectl get deployment payment-service -n production -o yaml | Select-String -Co
 
 **Por qué:** Asegurarse que los cambios de seguridad no rompen la aplicación.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 # Esperar a que el rollout complete
@@ -362,7 +362,7 @@ kubectl get pods -n production -l app=payment-service \
   -o jsonpath='{range .items[*]}{.metadata.name}{" readOnlyRootFilesystem="}{.spec.containers[0].securityContext.readOnlyRootFilesystem}{"\n"}{end}'
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 kubectl rollout status deployment/payment-service -n production --timeout=120s
@@ -389,7 +389,7 @@ kubectl get pods -n production -l app=payment-service `
 
 **Por qué:** Prevenir futuros Pods que no cumplan `Restricted`.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 # Activar warn (muestra warnings en stderr) y audit (registra en audit log)
@@ -404,7 +404,7 @@ kubectl label namespace production \
 kubectl get namespace production --show-labels
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 kubectl label namespace production `
@@ -474,7 +474,7 @@ kubectl delete pod insecure-test -n production
 
 **Por qué:** Asegurar que TODOS los Pods futuros cumplan `Restricted`.
 
-**En Linux/macOS:**
+![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
 # Activar enforce
@@ -487,7 +487,7 @@ kubectl label namespace production \
 kubectl get namespace production --show-labels
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 kubectl label namespace production `
@@ -555,7 +555,7 @@ kubectl logs $POD -n production | tail -20
 kubectl exec $POD -n production -- curl -s http://localhost:8080/health/live
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 $POD = kubectl get pods -n production -l app=payment-service -o jsonpath='{.items[0].metadata.name}'
@@ -597,7 +597,7 @@ kubectl get role,rolebinding -n production | grep payment
 kubectl get namespace production -o jsonpath='{.metadata.labels}' | tr ',' '\n'
 ```
 
-**En Windows (PowerShell):**
+![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
 kubectl get deployment payment-service -n production -o yaml | Select-String -Context 0,50 "spec:"
