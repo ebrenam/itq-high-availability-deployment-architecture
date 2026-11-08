@@ -299,9 +299,9 @@ En el IDE, abre el directorio `payment-service` que acabas de crear. Localiza y 
 
 **Por qué:** payment-service necesita validar que el producto existe antes de procesar un pago.
 
-**Modificar el archivo:**
+**Crear el archivo:**
 
-En el IDE, crea el archivo `src/main/java/com/ecom/payment/CatalogClient.java`. Agrega el siguiente contenido:
+En el IDE, dentro del proyecto `payment-service`, crea el archivo `src/main/java/com/ecom/payment/CatalogClient.java`. Agrega el siguiente contenido:
 
 ```java
 package com.ecom.payment;
@@ -333,9 +333,9 @@ public interface CatalogClient {
 
 Guarda el archivo.
 
-**Qué observar:** Esta es una interfaz JAX-RS con `@RegisterRestClient`. MicroProfile la implementa automáticamente en runtime. La URL base se configura en `application.properties` (que haremos en Paso 11).
+**Qué observar:** Esta es una interfaz JAX-RS que actúa como cliente HTTP dentro de payment-service. La anotación `@RegisterRestClient(configKey = "catalog-api")` vincula esta interfaz con la configuración en `application.properties` (que haremos en Paso 11). MicroProfile inyecta automáticamente la implementación en runtime.
 
-**Nota pedagógica:** En Kubernetes, `catalog-service:80` es el nombre DNS interno del Service. CoreDNS resuelve automáticamente este nombre a la IP del servicio, sin necesidad de usar IPs directas.
+**Nota pedagógica:** Esta clase se ejecuta **dentro de payment-service**, pero se conecta a `catalog-service:80` (nombre DNS interno de Kubernetes del servicio catalog). Este es el patrón de **comunicación inter-pod**: un Pod de payment-service busca otro Pod de catalog-service usando el nombre del Service interno.
 
 ---
 
@@ -345,9 +345,9 @@ Guarda el archivo.
 
 **Por qué:** payment-service debe reservar stock disponible antes de procesar un pago.
 
-**Modificar el archivo:**
+**Crear el archivo:**
 
-En el IDE, crea el archivo `src/main/java/com/ecom/payment/InventoryClient.java`. Agrega el siguiente contenido:
+En el IDE, dentro del proyecto `payment-service`, crea el archivo `src/main/java/com/ecom/payment/InventoryClient.java`. Agrega el siguiente contenido:
 
 ```java
 package com.ecom.payment;
@@ -383,9 +383,9 @@ public interface InventoryClient {
 
 Guarda el archivo.
 
-**Qué observar:** Similar a `CatalogClient`, es una interfaz con `@RegisterRestClient`. Define el método POST que envía `ReservationRequest` y recibe `ReservationResponse`. La URL base se configura en `application.properties`.
+**Qué observar:** Esta es una interfaz JAX-RS que actúa como cliente HTTP dentro de payment-service. La anotación `@RegisterRestClient(configKey = "inventory-api")` vincula esta interfaz con la configuración en `application.properties` (que haremos en Paso 11). MicroProfile inyecta automáticamente la implementación en runtime.
 
-**Nota pedagógica:** Ambos clientes usan el mismo patrón MicroProfile: declarar interfaz, anotar con `@RegisterRestClient`, dejar que el framework implemente la lógica HTTP. Esto es más limpio que construir requests manualmente.
+**Nota pedagógica:** Esta clase se ejecuta **dentro de payment-service**, pero se conecta a `inventory-service:80` (nombre DNS interno de Kubernetes del servicio inventory). Ambos clientes (CatalogClient e InventoryClient) siguen el patrón de **comunicación inter-pod**: un Pod de payment-service busca otros Pods de catalog e inventory usando los nombres de los Services internos.
 
 ---
 
