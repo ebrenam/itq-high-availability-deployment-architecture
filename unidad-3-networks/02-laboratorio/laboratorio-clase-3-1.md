@@ -101,7 +101,7 @@ Select-String "<version>" inventory-service/pom.xml | Select-Object -First 1
 
 > **Importante - Continuidad con U2:** En las unidades previas **no se modificó la versión del `pom.xml`**. En la Unidad 2 (Lab 2.2, Paso 8) el inventory-service pasó a `1.1.0` solo en el código Java (`"v1.1.0"`) y en el tag de la imagen Docker; el `pom.xml` se quedó en `1.0.0-SNAPSHOT`. Por eso aquí **no verás `1.1.0` en el pom.xml**: es lo esperado, no un error. Esta es la primera vez que actualizamos la versión del `pom.xml` (Paso 2).
 >
-> **Nota sobre manifiestos heredados:** Los directorios `catalog-service/k8s/` e `inventory-service/k8s/` ya existen del Laboratorio 2.2 de Unidad 2. En Paso 15 (Desplegar), usaremos los manifiestos heredados de U2 para catalog e inventory, y los nuevos manifiestos que crees en Paso 14 para payment-service. La reutilización de componentes es la esencia del desarrollo iterativo: cada unidad construye sobre la anterior.
+> **Nota sobre manifiestos heredados:** Los directorios `catalog-service/k8s/` e `inventory-service/k8s/` ya existen del Laboratorio 2.2 de Unidad 2. En Paso 5 actualizaremos el manifiesto de inventory-service a v1.2.0. En Paso 15 crearemos manifiestos nuevos para payment-service. En Paso 16 (Desplegar), desplegaremos los 3 servicios: catalog e inventory (heredados de U2 pero inventory actualizado a v1.2.0) y payment-service (nuevo). La reutilización de componentes es la esencia del desarrollo iterativo: cada unidad construye sobre la anterior.
 
 ---
 
@@ -225,7 +225,35 @@ docker inspect <tu_usuario>/inventory-service:1.2.0
 
 ---
 
-### Paso 5: Crear estructura Maven para payment-service
+### Paso 5: Actualizar manifiesto de inventory-service a v1.2.0
+
+**Qué hace:** Modificar el archivo `deployment-service.yaml` heredado de U2 para usar la imagen v1.2.0 que acabamos de compilar.
+
+**Por qué:** El manifest de U2 todavía referencia `inventory-service:1.0.0`. Como compilamos v1.2.0 con el nuevo endpoint `/reserve`, el manifest debe actualizarse para usar esa versión.
+
+**Modificar el archivo:**
+
+En el IDE, abre `inventory-service/k8s/deployment-service.yaml`. Busca la línea que dice:
+
+```yaml
+image: <tu-usuario-dockerhub>/inventory-service:1.0.0
+```
+
+Reemplázala por:
+
+```yaml
+image: <tu-usuario-dockerhub>/inventory-service:1.2.0
+```
+
+Guarda el archivo.
+
+**Qué observar:** El archivo ahora referencia la imagen v1.2.0. Cuando desplegemos en Paso 16, Kubernetes tirará esta versión (con el endpoint nuevo `/reserve`).
+
+**Nota pedagógica:** Este es un patrón común: cada vez que compilas una nueva versión de un servicio, necesitas actualizar su manifiesto Kubernetes para que use esa versión. En sistemas CI/CD reales, esto se automatiza, pero aquí lo hacemos manualmente para entender el flujo.
+
+---
+
+### Paso 6: Crear estructura Maven para payment-service
 
 **Qué hace:** Genera nuevo proyecto Quarkus con pom.xml y estructura estándar.
 
@@ -279,7 +307,7 @@ Select-String "<version>" pom.xml | Select-Object -First 2
 
 ---
 
-### Paso 6: Abrir payment-service en el IDE y actualizar pom.xml a versión 1.0.0
+### Paso 7: Abrir payment-service en el IDE y actualizar pom.xml a versión 1.0.0
 
 **Qué hace:** Cambia version de SNAPSHOT a 1.0.0 de producción.
 
@@ -293,7 +321,7 @@ En el IDE, abre el directorio `payment-service` que acabas de crear. Localiza y 
 
 ---
 
-### Paso 7: Crear CatalogClient (cliente HTTP a catalog-service)
+### Paso 8: Crear CatalogClient (cliente HTTP a catalog-service)
 
 **Qué hace:** Define el cliente HTTP que llama a `GET /v1/products/{id}` en catalog-service.
 
@@ -339,7 +367,7 @@ Guarda el archivo.
 
 ---
 
-### Paso 8: Crear InventoryClient (cliente HTTP a inventory-service)
+### Paso 9: Crear InventoryClient (cliente HTTP a inventory-service)
 
 **Qué hace:** Define el cliente HTTP que llama a `POST /v1/inventory/reserve` en inventory-service.
 
@@ -389,7 +417,7 @@ Guarda el archivo.
 
 ---
 
-### Paso 9: Crear PaymentService (orquestación con MicroProfile FaultTolerance)
+### Paso 10: Crear PaymentService (orquestación con MicroProfile FaultTolerance)
 
 **Qué hace:** Implementa la lógica de orquestación: valida producto, reserva inventario, simula procesamiento de pago.
 
@@ -478,7 +506,7 @@ Guarda el archivo.
 
 ---
 
-### Paso 10: Reemplazar PaymentResource (REST endpoint)
+### Paso 11: Reemplazar PaymentResource (REST endpoint)
 
 **Qué hace:** Redefine el endpoint HTTP `/v1/payments` que expone el servicio de pagos.
 
@@ -523,7 +551,7 @@ Esta separación hace el código testeable, mantenible y resiliente. El Resource
 
 ---
 
-### Paso 11: Configurar application.properties
+### Paso 12: Configurar application.properties
 
 **Qué hace:** Define propiedades de configuración de Quarkus para payment-service, incluyendo URLs de los servicios remotos.
 
@@ -556,7 +584,7 @@ Guarda el archivo.
 
 ---
 
-### Paso 12: Crear Dockerfile para payment-service
+### Paso 13: Crear Dockerfile para payment-service
 
 **Qué hace:** Define cómo empaquetar payment-service en una imagen Docker lista para Kubernetes.
 
@@ -597,7 +625,7 @@ Guarda el archivo.
 
 ---
 
-### Paso 13: Compilar y publicar payment-service v1.0.0 a Docker Hub
+### Paso 14: Compilar y publicar payment-service v1.0.0 a Docker Hub
 
 **Qué hace:** Compila el JAR, crea imagen Docker con el Dockerfile del Paso 12, publica como v1.0.0.
 
@@ -643,7 +671,7 @@ curl -s "https://hub.docker.com/v2/repositories/<tu_usuario>/payment-service/tag
 
 ---
 
-### Paso 14: Crear manifestos Kubernetes para payment-service
+### Paso 15: Crear manifestos Kubernetes para payment-service
 
 **Qué hace:** Definir cómo Kubernetes ejecutará payment-service con configuración de resiliencia y networking.
 
@@ -802,7 +830,7 @@ La configuración `maxSurge: 1` + `maxUnavailable: 0` implementa lo que Clase 3.
 
 ---
 
-### Paso 15: Desplegar los 3 servicios en Kubernetes
+### Paso 16: Desplegar los 3 servicios en Kubernetes
 
 **Qué hace:** Aplica manifiestos de catalog, inventory, y payment al clúster.
 
@@ -835,8 +863,7 @@ Get-ChildItem -Path proyecto-base-unidad-03 -Recurse -Include "deployment-servic
 ```bash
 proyecto-base-unidad-03/catalog-service/k8s/01-deployment.yaml
 proyecto-base-unidad-03/catalog-service/k8s/02-service.yaml
-proyecto-base-unidad-03/inventory-service/k8s/01-deployment.yaml
-proyecto-base-unidad-03/inventory-service/k8s/02-service.yaml
+proyecto-base-unidad-03/inventory-service/k8s/deployment-service.yaml
 proyecto-base-unidad-03/payment-service/k8s/deployment-service.yaml
 ```
 
@@ -852,8 +879,7 @@ kubectl apply -f catalog-service/k8s/01-deployment.yaml
 kubectl apply -f catalog-service/k8s/02-service.yaml
 
 # Desplegar inventory-service v1.2.0
-kubectl apply -f inventory-service/k8s/01-deployment.yaml
-kubectl apply -f inventory-service/k8s/02-service.yaml
+kubectl apply -f inventory-service/k8s/deployment-service.yaml
 
 # Desplegar payment-service v1.0.0
 kubectl apply -f payment-service/k8s/deployment-service.yaml
@@ -876,8 +902,7 @@ cd proyecto-base-unidad-03
 kubectl apply -f catalog-service/k8s/01-deployment.yaml
 kubectl apply -f catalog-service/k8s/02-service.yaml
 
-kubectl apply -f inventory-service/k8s/01-deployment.yaml
-kubectl apply -f inventory-service/k8s/02-service.yaml
+kubectl apply -f inventory-service/k8s/deployment-service.yaml
 
 kubectl apply -f payment-service/k8s/deployment-service.yaml
 
@@ -898,7 +923,7 @@ kubectl get svc
 
 ---
 
-### Paso 16: Probar comunicación inter-servicios (sin Gateway aún)
+### Paso 17: Probar comunicación inter-servicios (sin Gateway aún)
 
 **Qué hace:** Verifica que payment-service puede alcanzar catalog e inventory internamente.
 
@@ -942,7 +967,7 @@ kubectl exec -it $POD_NAME -- curl -X POST http://payment-service:80/v1/payments
 
 ---
 
-### Paso 17: Instalar Envoy Gateway y crear Gateway API
+### Paso 18: Instalar Envoy Gateway y crear Gateway API
 
 **Qué hace:** Instala Envoy Gateway Controller y recursos de Gateway API.
 
@@ -996,7 +1021,7 @@ kubectl get pods -n envoy-gateway-system
 
 ---
 
-### Paso 18: Crear certificado TLS y configurar Gateway + HTTPRoute
+### Paso 19: Crear certificado TLS y configurar Gateway + HTTPRoute
 
 **Qué hace:** Genera certificado autofirmado, lo monta en Secret K8s, y configura enrutamiento externo.
 
@@ -1135,7 +1160,7 @@ kubectl describe gateway payment-gateway
 
 ---
 
-### Paso 19: Probar acceso externo con TLS
+### Paso 20: Probar acceso externo con TLS
 
 **Qué hace:** Accede a payment-service desde fuera del clúster via HTTPS usando Gateway.
 
