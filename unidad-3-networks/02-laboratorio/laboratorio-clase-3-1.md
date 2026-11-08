@@ -512,9 +512,14 @@ public class PaymentResource {
 
 Guarda el archivo.
 
-**Qué observar:** Este es un controlador REST minimalista que inyecta `PaymentService` y delega toda la lógica. Nota que usa `PaymentService.PaymentRequest` y `PaymentService.PaymentResponse` (no define sus propios records). Sigue el patrón de arquitectura en capas: Resource (HTTP) → Service (lógica) → Clients (integración).
+**Qué observar:** Este controlador REST es deliberadamente simple: solo inyecta `PaymentService` y delega la solicitud. No define sus propios records (usa `PaymentService.PaymentRequest` y `PaymentService.PaymentResponse`). No maneja excepciones porque `PaymentService` ya lo hace, retornando siempre una respuesta válida (con estado FAILED si hay problemas).
 
-**Nota pedagógica:** Nota que ahora el flujo es claro desde abajo hacia arriba: primero definimos los clientes (Pasos 7-8) que hablan con otros servicios, luego el servicio (Paso 9) que orquesta, finalmente el controlador (Paso 10) que expone.
+**Nota pedagógica:** Observa la arquitectura en capas implementada:
+- **Clientes (Pasos 7-8)**: Hablan con otros servicios (catalog, inventory)
+- **Servicio (Paso 9)**: Orquesta la lógica de negocio, coordina clientes, maneja excepciones
+- **Resource (Paso 10)**: Solo expone HTTP, delega todo al servicio
+
+Esta separación hace el código testeable, mantenible y resiliente. El Resource es "dumb" (simple), el Service es "smart" (inteligente).
 
 ---
 
