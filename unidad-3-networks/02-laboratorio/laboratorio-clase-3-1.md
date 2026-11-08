@@ -62,7 +62,7 @@ grep "<version>" inventory-service/pom.xml | head -1
 ```powershell
 cd unidad-3-networks/02-laboratorio/proyecto-base-unidad-03
 
-ls catalog-service/, inventory-service/
+Get-ChildItem catalog-service/, inventory-service/
 
 Select-String "<version>" catalog-service/pom.xml | Select-Object -First 1
 Select-String "<version>" inventory-service/pom.xml | Select-Object -First 1
@@ -147,6 +147,10 @@ Guarda el archivo.
 
 **Por qué:** payment-service necesitará llamar a esta versión con el nuevo endpoint.
 
+**Compilar y publicar:**
+
+Desde tu IDE puedes ejecutar Maven directamente, o abrir una terminal. Los comandos son los mismos en ambos casos.
+
 ![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
@@ -166,8 +170,6 @@ docker push <tu_usuario>/inventory-service:1.2.0
 
 # Verificar en Docker Hub
 docker inspect <tu_usuario>/inventory-service:1.2.0
-
-cd ..
 ```
 
 ![win](images/windows.png) **Windows (PowerShell):**
@@ -177,18 +179,16 @@ cd inventory-service
 
 mvn clean package -DskipTests
 
-ls target/quarkus-app/
+Get-ChildItem -Path target/quarkus-app/
 
 docker build -t <tu_usuario>/inventory-service:1.2.0 .
 
 docker push <tu_usuario>/inventory-service:1.2.0
 
 docker inspect <tu_usuario>/inventory-service:1.2.0
-
-cd ..
 ```
 
-**Qué observar:** `docker push` debe completarse sin errores. En Docker Hub, la imagen aparece con tags `latest` y `1.2.0`.
+**Qué observar:** `docker push` debe completarse sin errores. En Docker Hub, la imagen aparece con el tag `1.2.0`.
 
 **Nota:** Reemplaza `<tu_usuario>` con tu usuario real de Docker Hub (ej: `jdoe`).
 
@@ -231,7 +231,7 @@ mvn io.quarkus.platform:quarkus-maven-plugin:3.40.1.1:create `
 
 cd payment-service
 
-ls
+Get-ChildItem
 
 Select-String "<version>" pom.xml | Select-Object -First 2
 ```
@@ -439,7 +439,7 @@ cd ..
 ```powershell
 mvn clean package -DskipTests
 
-ls target/quarkus-app/
+Get-ChildItem -Path target/quarkus-app/
 
 docker build -t <tu_usuario>/payment-service:1.0.0 .
 
