@@ -645,26 +645,46 @@ curl -s "https://hub.docker.com/v2/repositories/<tu_usuario>/payment-service/tag
 
 ### Paso 14: Crear manifestos Kubernetes para payment-service
 
-**Qué hace:** Define cómo se despliega payment-service en Kubernetes (Deployment y Service).
+**Qué hace:** Definir cómo Kubernetes ejecutará payment-service con configuración de resiliencia y networking.
 
-**Por qué:** Los manifiestos YAML describen la configuración del clúster; son parte del proyecto.
+**Por qué:** Los manifiestos YAML especifican a Kubernetes:
+- Cuántas réplicas ejecutar (resiliencia a fallos)
+- Cómo actualizar sin downtime (rolling updates con cero-downtime)
+- Si un Pod está listo para recibir tráfico (readiness probe)
+- Si un Pod sigue vivo o se quedó colgado (liveness probe)
+- Cómo exponer el servicio internamente (ClusterIP para comunicación inter-pod)
 
 **Nota de transición:** Hasta ahora hemos desarrollado código Java en el IDE (Pasos 2-11), creado el Dockerfile (Paso 12), y compilado + publicado la imagen Docker (Paso 13). Ahora creamos los archivos de configuración Kubernetes que describen cómo ejecutar la aplicación en el clúster. Estos también se crean en el IDE como archivos de proyecto.
 
-**Crear estructura de directorios:**
+**Contexto - Diferencias con Unidad 2:**
+
+En Unidad 2 (Laboratorio 2.2) creaste manifiestos para `inventory-service` v1.0.0. Aquí creamos manifiestos para `payment-service` v1.0.0. Ambos siguen el mismo patrón de resiliencia:
+
+| Aspecto | U2: inventory-service | U3: payment-service | Razón |
+|--------|-------|--------|------|
+| Replicas | 2 | 2 | Alta disponibilidad |
+| Health Checks | 3 tipos (/health/started, /health/ready, /health/live) | 3 tipos (rutas diferentes: /health/startup, /health/ready, /health/live) | Mismo mecanismo, nomenclatura de Quarkus |
+| RollingUpdate | maxSurge: 1, maxUnavailable: 0 | maxSurge: 1, maxUnavailable: 0 | Cero-downtime updates (heredado de U2) |
+| imagePullPolicy | Always | Always | Asegurar última versión en Docker Hub |
+| Resources (CPU/Memory) | 100m / 256Mi (requests), 500m / 512Mi (limits) | 100m / 256Mi (requests), 500m / 512Mi (limits) | QoS estándar para microservicios |
+| Service type | ClusterIP | ClusterIP | Acceso interno únicamente (Gateway expondrá externamente en Paso 18) |
+| Namespace | default | default | Ambos usan namespace default |
+
+---
+
+### Crear estructura de directorios
 
 En el IDE, desde la raíz del proyecto, crea la carpeta `payment-service/k8s/` (si no existe).
 
-**Crear archivo `payment-service/k8s/01-deployment.yaml`:**
+### Crear archivo `payment-service/k8s/deployment-service.yaml`
 
-En el IDE, dentro de `payment-service/k8s/`, crea el archivo `01-deployment.yaml` con el siguiente contenido:
+En el IDE, dentro de `payment-service/k8s/`, crea el archivo `deployment-service.yaml` con el siguiente contenido:
 
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: payment-service
-  namespace: production
   labels:
     app: payment-service
     version: v1.0.0
@@ -673,8 +693,8 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+      maxSurge: 1           # Permite 1 Pod extra durante actualización
+      maxUnavailable: 0     # NUNCA permite 0 Pods: zero-downtime
   selector:
     matchLabels:
       app: payment-service
@@ -682,37 +702,15 @@ spec:
     metadata:
       labels:
         app: payment-service
+        version: v1.0.0
     spec:
       containers:
         - name: payment-service
           image: <tu_usuario>/payment-service:1.0.0
-          imagePullPolicy: Always
+          imagePullPolicy: Always            # Siempre tira imagen fresca de Docker Hub
           ports:
-            - name: http
-              containerPort: 8080
-          env:
-            - name: QUARKUS_HTTP_PORT
-              value: "8080"
-          livenessProbe:
-            httpGet:
-              path: /health/live
-              port: http
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /health/ready
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 2
-          startupProbe:
-            httpGet:
-              path: /health/startup
-              port: http
-            failureThreshold: 30
-            periodSeconds: 2
+            - containerPort: 8080
+              name: http
           resources:
             requests:
               cpu: 100m
@@ -720,20 +718,45 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
-```
+        
+          # 1. StartupProbe: ¿Arrancó la JVM correctamente?
+          # Endpoint: curl http://localhost:8080/health/startup
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: 8080
+            initialDelaySeconds: 0
+            periodSeconds: 2
+            timeoutSeconds: 1
+            failureThreshold: 30          # Máx 30 reintentos (60 segundos)
+        
+          # 2. ReadinessProbe: ¿Listo para recibir tráfico?
+          # Endpoint: curl http://localhost:8080/health/ready
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+        
+          # 3. LivenessProbe: ¿Sigue vivo o se quedó colgado?
+          # Endpoint: curl http://localhost:8080/health/live
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
 
-Guarda el archivo.
-
-**Crear archivo `payment-service/k8s/02-service.yaml`:**
-
-En el IDE, crea el archivo `payment-service/k8s/02-service.yaml` con el siguiente contenido:
-
-```yaml
+---
 apiVersion: v1
 kind: Service
 metadata:
   name: payment-service
-  namespace: production
   labels:
     app: payment-service
 spec:
@@ -741,17 +764,65 @@ spec:
   selector:
     app: payment-service
   ports:
-    - name: http
-      port: 80
-      targetPort: http
+    - port: 80
+      targetPort: 8080
       protocol: TCP
+      name: http
 ```
 
 Guarda el archivo.
 
-**Qué observar:** Ambos archivos YAML están creados en el proyecto. Nota que `imagePullPolicy: Always` fuerza pull de Docker Hub y `spec.type: ClusterIP` implementa lo enseñado en Clase 3.1 (Service de capa 4 para acceso interno).
+---
 
-**Nota pedagógica:** Los `*Probe` (liveness, readiness, startup) son los Health Checks que viste en Unidad 2. `startupProbe` es importante para apps Java que tardan en iniciar (da 60 segundos: 30 reintentos × 2 segundos).
+### Qué observar en Paso 14
+
+**Archivo creado:**
+```
+payment-service/k8s/
+└── deployment-service.yaml    # Deployment + Service juntos
+```
+
+**Estructura del archivo:**
+
+El archivo combina dos recursos Kubernetes (separated by `---`):
+1. **Deployment** (líneas 1-62): Cómo ejecutar payment-service
+2. **Service** (líneas 64-76): Cómo exponer payment-service internamente
+
+Este es el mismo patrón que usaste en Unidad 2 Lab 2.2 para `inventory-service`.
+
+**Elementos clave en el Deployment:**
+
+| Elemento | Propósito | Observación |
+|----------|-----------|-------------|
+| `replicas: 2` | 2 Pods corriendo simultáneamente | Resiliencia: si uno falla, el otro atiende |
+| `maxSurge: 1, maxUnavailable: 0` | Rolling update sin downtime | Durante actualización: máx 3 Pods, mín 2 Pods siempre activos |
+| `imagePullPolicy: Always` | Siempre traer imagen fresca de Docker Hub | Asegurar que no usas versión cacheada del nodo |
+| `startupProbe` (30 reintentos × 2s) | 60 segundos para iniciar JVM | Java startup es lento; este tiempo es normal |
+| `readinessProbe` (10 segundos) | Esperar antes de enviar tráfico | Asegurar que la app está lista (DB connections, etc.) |
+| `livenessProbe` (30 segundos) | Detectar "hangs" y reintentar | Si no responde, Kubernetes reinicia el Pod |
+| `resources.requests` | Garantizar recursos mínimos | Kubernetes coloca el Pod si hay >= 100m CPU + 256Mi RAM |
+| `resources.limits` | Evitar que consume todo | Si sobrepasa 500m CPU o 512Mi RAM, se mata |
+
+**Elementos clave en el Service:**
+
+| Elemento | Propósito | Observación |
+|----------|-----------|-------------|
+| `type: ClusterIP` | Acceso interno únicamente (default) | No es accesible desde fuera del clúster (Gateway lo expondrá en Paso 18) |
+| `port: 80` | Puerto de escucha del Service | Los Pods internos usan este puerto para comunicarse |
+| `targetPort: http` | Puerto del contenedor (8080) | Service redirecciona puerto 80 → containerPort 8080 |
+
+**Nota pedagógica - Continuidad con Unidad 2:**
+
+Los Health Checks (`startupProbe`, `readinessProbe`, `livenessProbe`) son exactamente los mismos mecanismos que usaste en Unidad 2 Lab 2.2 para `inventory-service`. Aquí vemos cómo son reutilizables en cualquier microservicio. Los valores específicos pueden variar (Unidad 2 usaba `/health/started`, aquí usamos `/health/startup`), pero el concepto es idéntico.
+
+**Nota pedagógica - RollingUpdate con cero-downtime:**
+
+La configuración `maxSurge: 1` + `maxUnavailable: 0` implementa lo que Clase 3.1 enseñó: actualizaciones sin interrupción de tráfico. Durante la actualización de v1.0.0 a v1.0.1 (en futuro):
+1. Kubernetes crea 1 Pod nuevo (maxSurge: 1) → total 3 Pods (v1.0.0 + v1.0.0 + v1.0.1 nuevo)
+2. Envía tráfico al nuevo Pod (readinessProbe confirma listo)
+3. Mata 1 Pod viejo → total 2 Pods (v1.0.0 + v1.0.1)
+4. Repite hasta que solo quedan 2 Pods v1.0.1
+5. Resultado: Cero downtime, tráfico siempre atendido
 
 ---
 
@@ -767,11 +838,8 @@ Guarda el archivo.
 # Verifica que tienes Minikube/Kind ejecutándose
 kubectl cluster-info
 
-# Verifica namespace production
-kubectl get namespace production || kubectl create namespace production
-
 # Verifica que los 3 servicios tienen manifiestos
-find proyecto-base-unidad-03 -name "01-deployment.yaml" -o -name "02-service.yaml" | sort
+find proyecto-base-unidad-03 -name "deployment-service.yaml" -o -name "01-deployment.yaml" -o -name "02-service.yaml" | sort
 ```
 
 ![linux](images/linux.png) **Desplegar (Linux/macOS):**
@@ -788,17 +856,16 @@ kubectl apply -f inventory-service/k8s/01-deployment.yaml
 kubectl apply -f inventory-service/k8s/02-service.yaml
 
 # Desplegar payment-service v1.0.0
-kubectl apply -f payment-service/k8s/01-deployment.yaml
-kubectl apply -f payment-service/k8s/02-service.yaml
+kubectl apply -f payment-service/k8s/deployment-service.yaml
 
 # Espera a que los Pods estén Ready
-kubectl rollout status deployment/catalog-service -n production --timeout=120s
-kubectl rollout status deployment/inventory-service -n production --timeout=120s
-kubectl rollout status deployment/payment-service -n production --timeout=120s
+kubectl rollout status deployment/catalog-service --timeout=120s
+kubectl rollout status deployment/inventory-service --timeout=120s
+kubectl rollout status deployment/payment-service --timeout=120s
 
 # Verifica estado
-kubectl get pods -n production -o wide
-kubectl get svc -n production
+kubectl get pods -o wide
+kubectl get svc
 ```
 
 ![win](images/windows.png) **Desplegar (Windows - PowerShell):**
@@ -812,21 +879,20 @@ kubectl apply -f catalog-service/k8s/02-service.yaml
 kubectl apply -f inventory-service/k8s/01-deployment.yaml
 kubectl apply -f inventory-service/k8s/02-service.yaml
 
-kubectl apply -f payment-service/k8s/01-deployment.yaml
-kubectl apply -f payment-service/k8s/02-service.yaml
+kubectl apply -f payment-service/k8s/deployment-service.yaml
 
-kubectl rollout status deployment/catalog-service -n production --timeout=120s
-kubectl rollout status deployment/inventory-service -n production --timeout=120s
-kubectl rollout status deployment/payment-service -n production --timeout=120s
+kubectl rollout status deployment/catalog-service --timeout=120s
+kubectl rollout status deployment/inventory-service --timeout=120s
+kubectl rollout status deployment/payment-service --timeout=120s
 
-kubectl get pods -n production -o wide
-kubectl get svc -n production
+kubectl get pods -o wide
+kubectl get svc
 ```
 
 **Qué observar:** 
 - Todos los Pods están en `Running` (2 replicas cada uno = 6 Pods totales)
 - Los Services tienen ClusterIP asignadas
-- `kubectl logs pod/<pod_name> -n production` muestra logs de Quarkus sin errores
+- `kubectl logs pod/<pod_name>` muestra logs de Quarkus sin errores
 
 **Nota pedagógica:** Los Pods pueden tardar 30-60 segundos en iniciar debido a `startupProbe`. Es normal.
 
@@ -842,13 +908,13 @@ kubectl get svc -n production
 
 ```bash
 # Acceder a un Pod de payment-service
-POD_NAME=$(kubectl get pods -n production -l app=payment-service -o jsonpath='{.items[0].metadata.name}')
+POD_NAME=$(kubectl get pods -l app=payment-service -o jsonpath='{.items[0].metadata.name}')
 
 # Prueba 1: Ver logs
-kubectl logs $POD_NAME -n production -f
+kubectl logs $POD_NAME -f
 
 # Prueba 2: Hacer un curl interno desde otro Pod
-kubectl exec -it $POD_NAME -n production -- curl -X POST http://payment-service:80/v1/payments \
+kubectl exec -it $POD_NAME -- curl -X POST http://payment-service:80/v1/payments \
   -H "Content-Type: application/json" \
   -d '{"productId":"PROD-001","quantity":1,"amount":19.99}' 
 
@@ -858,11 +924,11 @@ kubectl exec -it $POD_NAME -n production -- curl -X POST http://payment-service:
 ![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
-$POD_NAME = kubectl get pods -n production -l app=payment-service -o jsonpath='{.items[0].metadata.name}'
+$POD_NAME = kubectl get pods -l app=payment-service -o jsonpath='{.items[0].metadata.name}'
 
-kubectl logs $POD_NAME -n production -f
+kubectl logs $POD_NAME -f
 
-kubectl exec -it $POD_NAME -n production -- curl -X POST http://payment-service:80/v1/payments `
+kubectl exec -it $POD_NAME -- curl -X POST http://payment-service:80/v1/payments `
   -H "Content-Type: application/json" `
   -d '{"productId":"PROD-001","quantity":1,"amount":19.99}'
 ```
@@ -872,7 +938,7 @@ kubectl exec -it $POD_NAME -n production -- curl -X POST http://payment-service:
 **Nota pedagógica:** Si falla con timeout, puede ser:
 1. Pods aún no listo (espera más)
 2. Imagen Docker no se descargó (verifica `kubectl describe pod`)
-3. DNS no funciona (intenta con IP: `kubectl get svc -n production` y usa ClusterIP)
+3. DNS no funciona (intenta con IP: `kubectl get svc` y usa ClusterIP)
 
 ---
 
@@ -954,11 +1020,10 @@ openssl x509 -in payment.crt -text -noout | head -20
 # Crea Secret de TLS en K8s
 kubectl create secret tls payment-tls-secret \
   --cert=payment.crt \
-  --key=payment.key \
-  --namespace=production
+  --key=payment.key
 
 # Verifica
-kubectl get secret -n production
+kubectl get secret
 ```
 
 **Generar certificado (Windows - PowerShell):**
@@ -975,8 +1040,7 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 
 kubectl create secret tls payment-tls-secret \
   --cert=payment.crt \
-  --key=payment.key \
-  --namespace=production
+  --key=payment.key
 ```
 
 **Crear archivo `payment-service/k8s/03-gateway.yaml`:**
@@ -995,7 +1059,6 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: payment-gateway
-  namespace: production
 spec:
   gatewayClassName: eg
   listeners:
@@ -1005,7 +1068,7 @@ spec:
       hostname: payment.local
       allowedRoutes:
         namespaces:
-          from: Same
+          from: All
     - name: https
       protocol: HTTPS
       port: 443
@@ -1017,13 +1080,12 @@ spec:
             name: payment-tls-secret
       allowedRoutes:
         namespaces:
-          from: Same
+          from: All
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: payment-route
-  namespace: production
 spec:
   parentRefs:
     - name: payment-gateway
@@ -1043,7 +1105,6 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: payment-http-redirect
-  namespace: production
 spec:
   parentRefs:
     - name: payment-gateway
@@ -1063,8 +1124,8 @@ spec:
 ```bash
 kubectl apply -f payment-service/k8s/03-gateway.yaml
 
-kubectl get gatewayclass,gateway,httproute -n production
-kubectl describe gateway payment-gateway -n production
+kubectl get gatewayclass,gateway,httproute
+kubectl describe gateway payment-gateway
 ```
 
 **Qué observar:** 
@@ -1155,9 +1216,9 @@ curl --resolve payment.local:8080:127.0.0.1 `
 
 1. **Comandos clave ejecutados:**
    ```bash
-   kubectl get pods,svc -n production
-   kubectl logs <payment-pod> -n production | head -20
-   kubectl get gateway,httproute -n production
+   kubectl get pods,svc
+   kubectl logs <payment-pod> | head -20
+   kubectl get gateway,httproute
    ```
 
 2. **Respuesta de pago exitosa (captura JSON):**
