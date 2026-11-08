@@ -810,6 +810,8 @@ La configuración `maxSurge: 1` + `maxUnavailable: 0` implementa lo que Clase 3.
 
 **Validación previa:**
 
+![linux](images/linux.png) **Linux/macOS:**
+
 ```bash
 # Verifica que tienes Minikube/Kind ejecutándose
 kubectl cluster-info
@@ -817,6 +819,28 @@ kubectl cluster-info
 # Verifica que los 3 servicios tienen manifiestos
 find proyecto-base-unidad-03 -name "deployment-service.yaml" -o -name "01-deployment.yaml" -o -name "02-service.yaml" | sort
 ```
+
+![win](images/windows.png) **Windows (PowerShell):**
+
+```powershell
+# Verifica que tienes Minikube/Kind ejecutándose
+kubectl cluster-info
+
+# Verifica que los 3 servicios tienen manifiestos
+Get-ChildItem -Path proyecto-base-unidad-03 -Recurse -Include "deployment-service.yaml", "01-deployment.yaml", "02-service.yaml" | Sort-Object FullName | ForEach-Object { $_.FullName -replace '\\', '/' }
+```
+
+**Salida esperada (ambos):**
+
+```bash
+proyecto-base-unidad-03/catalog-service/k8s/01-deployment.yaml
+proyecto-base-unidad-03/catalog-service/k8s/02-service.yaml
+proyecto-base-unidad-03/inventory-service/k8s/01-deployment.yaml
+proyecto-base-unidad-03/inventory-service/k8s/02-service.yaml
+proyecto-base-unidad-03/payment-service/k8s/deployment-service.yaml
+```
+
+**Si obtienes esta salida, significa que todos los manifiestos están en su lugar.**
 
 ![linux](images/linux.png) **Desplegar (Linux/macOS):**
 
