@@ -879,6 +879,7 @@ kubectl apply -f catalog-service/k8s/01-deployment.yaml
 kubectl apply -f catalog-service/k8s/02-service.yaml
 
 # Desplegar inventory-service v1.2.0
+kubectl apply -f inventory-service/k8s/config-secrets.yaml
 kubectl apply -f inventory-service/k8s/deployment-service.yaml
 
 # Desplegar payment-service v1.0.0
