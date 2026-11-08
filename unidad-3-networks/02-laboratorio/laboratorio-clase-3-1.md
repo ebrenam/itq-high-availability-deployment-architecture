@@ -35,6 +35,35 @@
 
 ---
 
+## Conexión con la clase 3.1
+
+**Conceptos teóricos aplicados en este laboratorio:**
+
+En Clase 3.1 aprendiste cómo Kubernetes expone servicios mediante **Services** y recursos de entrada como **Gateway API**. Este laboratorio pone en práctica esos conceptos:
+
+| Concepto de clase | Implementación en el laboratorio |
+|---|---|
+| **ClusterIP (Service)** | `catalog-service` e `inventory-service` usan ClusterIP (acceso interno). `payment-service` también usa ClusterIP internamente. |
+| **Comunicación inter-pod** | `payment-service` realiza llamadas HTTP reales a `catalog-service` e `inventory-service` usando nombres DNS internos (`catalog-service:80`, `inventory-service:80`). |
+| **Gateway API** | Exponemos `payment-service` públicamente mediante **Envoy Gateway** con recurso `Gateway` y `HTTPRoute`, con terminación TLS. |
+| **Caso de uso E-commerce** | Implementas el escenario exacto descrito en clase: 3 microservicios donde payment orquesta, catalog y inventory son internos, y payment es accesible externamente. |
+
+**Arquitectura que construirás:**
+
+```
+Internet (HTTPS) 
+    ↓ [Envoy Gateway + Gateway API]
+    ↓ (TLS termination)
+payment-service (ClusterIP) 
+    ↓ (HTTP interno)
+    ├→ catalog-service (ClusterIP) 
+    └→ inventory-service (ClusterIP)
+```
+
+Los Services internos usan ClusterIP (descrito en clase como el balanceador de capa 4 para consumo interno). El Gateway implementa la entrada HTTP/HTTPS (conceptualmente el "Controlador de entrada" de Clase 3.1).
+
+---
+
 ## Pasos del laboratorio
 
 ### Paso 1: Preparar la carpeta de trabajo
@@ -70,7 +99,9 @@ Select-String "<version>" inventory-service/pom.xml | Select-Object -First 1
 
 **Qué observar:** Ambas carpetas existen con archivos pom.xml legibles. Las versiones deben ser `1.0.0` (catalog) y `1.0.0-SNAPSHOT` (inventory).
 
-> **Importante:** En las unidades previas **no se modificó la versión del `pom.xml`**. En la Unidad 2 (Lab 2.2, Paso 8) el inventory-service pasó a `1.1.0` solo en el código Java (`"v1.1.0"`) y en el tag de la imagen Docker; el `pom.xml` se quedó en `1.0.0-SNAPSHOT`. Por eso aquí **no verás `1.1.0` en el pom.xml**: es lo esperado, no un error. Esta es la primera vez que actualizamos la versión del `pom.xml` (Paso 2).
+> **Importante - Continuidad con U2:** En las unidades previas **no se modificó la versión del `pom.xml`**. En la Unidad 2 (Lab 2.2, Paso 8) el inventory-service pasó a `1.1.0` solo en el código Java (`"v1.1.0"`) y en el tag de la imagen Docker; el `pom.xml` se quedó en `1.0.0-SNAPSHOT`. Por eso aquí **no verás `1.1.0` en el pom.xml**: es lo esperado, no un error. Esta es la primera vez que actualizamos la versión del `pom.xml` (Paso 2).
+>
+> **Nota sobre manifiestos heredados:** Los directorios `catalog-service/k8s/` e `inventory-service/k8s/` ya existen del Laboratorio 2.2 de Unidad 2. En Paso 14 (Desplegar), usaremos los manifiestos heredados de U2 para catalog e inventory, y los nuevos manifiestos que crees en Paso 13 para payment-service. La reutilización de componentes es la esencia del desarrollo iterativo: cada unidad construye sobre la anterior.
 
 ---
 
@@ -262,11 +293,196 @@ En el IDE, abre el directorio `payment-service` que acabas de crear. Localiza y 
 
 ---
 
-### Paso 7: Crear PaymentResource (REST endpoint)
+### Paso 7: Crear CatalogClient (cliente HTTP a catalog-service)
 
-**Qué hace:** Define el endpoint HTTP `/v1/payments` que recibe solicitudes de pago.
+**Qué hace:** Define el cliente HTTP que llama a `GET /v1/products/{id}` en catalog-service.
 
-**Por qué:** Es la "puerta de entrada" de payment-service; orquesta las llamadas a otros servicios.
+**Por qué:** payment-service necesita validar que el producto existe antes de procesar un pago.
+
+**Modificar el archivo:**
+
+En el IDE, crea el archivo `src/main/java/com/ecom/payment/CatalogClient.java`. Agrega el siguiente contenido:
+
+```java
+package com.ecom.payment;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
+
+@RegisterRestClient(configKey = "catalog-api")
+@Path("/v1/products")
+@Produces(MediaType.APPLICATION_JSON)
+public interface CatalogClient {
+
+    @GET
+    @Path("/{id}")
+    ProductResponse getProduct(@PathParam("id") String productId);
+
+    public record ProductResponse(
+        String id,
+        String name,
+        double price,
+        String category
+    ) {}
+}
+```
+
+Guarda el archivo.
+
+**Qué observar:** Esta es una interfaz JAX-RS con `@RegisterRestClient`. MicroProfile la implementa automáticamente en runtime. La URL base se configura en `application.properties` (que haremos en Paso 11).
+
+**Nota pedagógica:** En Kubernetes, `catalog-service:80` es el nombre DNS interno del Service. CoreDNS resuelve automáticamente este nombre a la IP del servicio, sin necesidad de usar IPs directas.
+
+---
+
+### Paso 8: Crear InventoryClient (cliente HTTP a inventory-service)
+
+**Qué hace:** Define el cliente HTTP que POST a `/v1/inventory/reserve` en inventory-service.
+
+**Por qué:** payment-service debe reservar stock disponible antes de procesar un pago.
+
+**Modificar el archivo:**
+
+En el IDE, crea el archivo `src/main/java/com/ecom/payment/InventoryClient.java`. Agrega el siguiente contenido:
+
+```java
+package com.ecom.payment;
+
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
+import java.time.Instant;
+
+@RegisterRestClient(configKey = "inventory-api")
+@Path("/v1/inventory")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public interface InventoryClient {
+
+    @POST
+    @Path("/reserve")
+    ReservationResponse reserveInventory(ReservationRequest request);
+
+    public record ReservationRequest(String productId, int quantity) {}
+    
+    public record ReservationResponse(
+        String productId,
+        int reservedQuantity,
+        String status,
+        Instant timestamp
+    ) {}
+}
+```
+
+Guarda el archivo.
+
+**Qué observar:** Similar a `CatalogClient`, es una interfaz con `@RegisterRestClient`. Define el método POST que envía `ReservationRequest` y recibe `ReservationResponse`. La URL base se configura en `application.properties`.
+
+**Nota pedagógica:** Ambos clientes usan el mismo patrón MicroProfile: declarar interfaz, anotar con `@RegisterRestClient`, dejar que el framework implemente la lógica HTTP. Esto es más limpio que construir requests manualmente.
+
+---
+
+### Paso 9: Crear PaymentService (orquestación con MicroProfile FaultTolerance)
+
+**Qué hace:** Implementa la lógica de orquestación: valida producto, reserva inventario, simula procesamiento de pago.
+
+**Por qué:** Centraliza la lógica de negocio e integra los dos clientes HTTP con resiliencia (`@Timeout`, `@Retry`).
+
+**Modificar el archivo:**
+
+En el IDE, crea el archivo `src/main/java/com/ecom/payment/PaymentService.java`. Agrega el siguiente contenido:
+
+```java
+package com.ecom.payment;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.faulttolerance.Retry;
+import org.eclipse.microprofile.faulttolerance.Timeout;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
+import java.time.Instant;
+import java.util.UUID;
+
+@ApplicationScoped
+public class PaymentService {
+
+    @RestClient
+    CatalogClient catalogClient;
+
+    @RestClient
+    InventoryClient inventoryClient;
+
+    @Timeout(3000)
+    @Retry(maxRetries = 2, delay = 500)
+    public PaymentResponse processPayment(PaymentRequest request) {
+        String transactionId = UUID.randomUUID().toString().substring(0, 12).toUpperCase();
+        
+        try {
+            // Validar producto en catalog
+            CatalogClient.ProductResponse product = catalogClient.getProduct(request.productId());
+            if (product == null) {
+                return new PaymentResponse(transactionId, "FAILED", request.productId(), 
+                    request.quantity(), request.amount(), "Product not found", Instant.now());
+            }
+            
+            // Reservar en inventory
+            InventoryClient.ReservationResponse reservation = 
+                inventoryClient.reserveInventory(new InventoryClient.ReservationRequest(
+                    request.productId(), request.quantity()));
+            
+            if (!"RESERVED".equals(reservation.status())) {
+                return new PaymentResponse(transactionId, "FAILED", request.productId(), 
+                    request.quantity(), request.amount(), "Inventory not available", Instant.now());
+            }
+            
+            // Simular procesamiento de pago (90% éxito)
+            boolean paymentApproved = Math.random() < 0.9;
+            String status = paymentApproved ? "APPROVED" : "FAILED";
+            String message = paymentApproved ? "Payment processed successfully" : "Payment declined by processor";
+            
+            return new PaymentResponse(transactionId, status, request.productId(), 
+                request.quantity(), request.amount(), message, Instant.now());
+                
+        } catch (Exception e) {
+            return new PaymentResponse(transactionId, "FAILED", request.productId(), 
+                request.quantity(), request.amount(), "Service error: " + e.getMessage(), Instant.now());
+        }
+    }
+
+    // Records for request/response
+    public record PaymentRequest(String productId, int quantity, double amount) {}
+
+    public record PaymentResponse(
+        String transactionId,
+        String status,
+        String productId,
+        int quantity,
+        double amount,
+        String message,
+        Instant timestamp
+    ) {}
+}
+```
+
+Guarda el archivo.
+
+**Qué observar:** La clase es anotada con `@ApplicationScoped` (singleton). Inyecta ambos clientes con `@RestClient`. Los métodos tienen `@Timeout` (límite de 3 segundos total) y `@Retry` (reintentos automáticos). El flujo es claro: validar → reservar → pagar.
+
+**Nota pedagógica:** El 90% de éxito simula un "mundo real" donde los pagos a veces fallan. Los reintentos automáticos mejoran resilencia ante fallos transitorios de red.
+
+---
+
+### Paso 10: Crear PaymentResource (REST endpoint)
+
+**Qué hace:** Define el endpoint HTTP `/v1/payments` que expone el servicio de pagos.
+
+**Por qué:** Es la "puerta de entrada" de payment-service; los clientes (internos o externos) llaman a este endpoint.
 
 **Modificar el archivo:**
 
@@ -290,23 +506,22 @@ public class PaymentResource {
     PaymentService paymentService;
 
     @POST
-    public PaymentResponse processPayment(PaymentRequest request) {
+    public PaymentResponse processPayment(PaymentService.PaymentRequest request) {
         try {
             return paymentService.processPayment(request);
         } catch (Exception e) {
+            String transactionId = UUID.randomUUID().toString().substring(0, 12);
             return new PaymentResponse(
-                UUID.randomUUID().toString().substring(0, 12),
+                transactionId,
                 "FAILED",
                 request.productId(),
                 request.quantity(),
                 request.amount(),
-                e.getMessage(),
+                "Endpoint error: " + e.getMessage(),
                 Instant.now()
             );
         }
     }
-
-    public record PaymentRequest(String productId, int quantity, double amount) {}
 
     public record PaymentResponse(
         String transactionId,
@@ -322,79 +537,42 @@ public class PaymentResource {
 
 Guarda el archivo.
 
-**Qué observar:** El archivo es compilable y define el endpoint `@POST /v1/payments`. Nota que inyecta `PaymentService` (la crearemos en el Paso 8) y retorna transactionId único (UUID truncado) junto con el estado de la operación.
+**Qué observar:** Es un controlador REST simple que inyecta `PaymentService` y delega la lógica. Sigue el patrón de arquitectura en capas: Resource (HTTP) → Service (lógica) → Clients (integración).
 
-**Nota pedagógica:** En producción, este transactionId se almacenaría en una base de datos para auditoría y trazabilidad de transacciones.
-
----
-
-### Paso 8: Crear PaymentService (orquestación con MicroProfile FaultTolerance)
-
-**Qué hace:** Orquesta la lógica: valida producto, reserva inventario, simula pago.
-
-**Por qué:** Demuestra patrones reales: @Timeout, @Retry, y decisiones de negocio.
-
-**Crear archivo `src/main/java/com/ecom/payment/PaymentService.java`:**
-
-Genera el archivo con el siguiente contenido:
-
-**Qué observar:** La clase usa `@Timeout` para timeout de 3 segundos total, con `@Retry` para reintentos en llamadas a clientes. Esto es resilience real.
-
-**Nota pedagógica:** El 90% de éxito en pagos es para simular "mundo real" donde no todo es éxito. En producción, se validaría con gateway real.
-
----
-
-### Paso 9: Crear CatalogClient (cliente HTTP a catalog-service)
-
-**Qué hace:** Cliente JAX-RS que llama GET /v1/products/{id} en catalog-service.
-
-**Por qué:** payment-service necesita validar que el producto existe antes de procesar pago.
-
-**Crear archivo `src/main/java/com/ecom/payment/CatalogClient.java`:**
-
-Genera el archivo con el siguiente contenido:
-
-**Qué observar:** URL es `http://catalog-service:80`. Este es nombre DNS interno de Kubernetes; resuelve a la IP del Service.
-
-**Nota pedagógica:** `catalog-service:80` funciona porque Kubernetes CoreDNS resuelve automáticamente nombres de Service. No usamos IP directa.
-
----
-
-### Paso 10: Crear InventoryClient (cliente HTTP a inventory-service)
-
-**Qué hace:** Cliente JAX-RS que POST a /v1/inventory/reserve en inventory-service.
-
-**Por qué:** payment-service debe reservar stock antes de procesar pago.
-
-**Crear archivo `src/main/java/com/ecom/payment/InventoryClient.java`:**
-
-Genera el archivo con el siguiente contenido:
-
-**Qué observar:** URL es `http://inventory-service:80` (DNS interno). POST envía JSON con productId y quantity.
-
-**Nota pedagógica:** Ambos clientes usan el mismo patrón: construir URL con DNS del servicio, enviar request JSON, parsear respuesta.
+**Nota pedagógica:** Nota que ahora el flujo es claro desde abajo hacia arriba: primero definimos los clientes (Pasos 7-8) que hablan con otros servicios, luego el servicio (Paso 9) que orquesta, finalmente el controlador (Paso 10) que expone.
 
 ---
 
 ### Paso 11: Configurar application.properties
 
-**Qué hace:** Define propiedades de configuración de Quarkus para payment-service.
+**Qué hace:** Define propiedades de configuración de Quarkus para payment-service, incluyendo URLs de los servicios remotos.
 
-**Por qué:** Ports, health endpoints, y nombre de aplicación.
+**Por qué:** Centraliza la configuración (puertos, URLs de clientes HTTP, health checks) en un lugar.
 
-**Crear o editar archivo `src/main/resources/application.properties`:**
+**Modificar el archivo:**
 
-Copia el siguiente contenido:
+En el IDE, abre o crea el archivo `src/main/resources/application.properties`. Agrega el siguiente contenido:
 
 ```properties
+# Server configuration
 quarkus.http.port=8080
 quarkus.http.host=0.0.0.0
 quarkus.application.name=payment-service
 quarkus.application.version=1.0.0
 quarkus.smallrye-health.root-path=/health
+
+# REST Client configuration for catalog-service
+quarkus.rest-client."catalog-api".url=http://catalog-service:80
+
+# REST Client configuration for inventory-service
+quarkus.rest-client."inventory-api".url=http://inventory-service:80
 ```
 
-**Qué observar:** Archivo está creado con settings correctos.
+Guarda el archivo.
+
+**Qué observar:** Las URLs de los clientes HTTP (`catalog-api` e `inventory-api`) están configuradas con nombres DNS internos de Kubernetes (`catalog-service:80`, `inventory-service:80`). Kubernetes CoreDNS resuelve automáticamente estos nombres a las IPs de los Services.
+
+**Nota pedagógica:** Las propiedades con `quarkus.rest-client` se mapean a las interfaces `@RegisterRestClient` que definimos en los Pasos 7-8 mediante el parámetro `configKey`.
 
 ---
 
@@ -439,8 +617,6 @@ docker push <tu_usuario>/payment-service:1.0.0
 
 # Verifica (requiere curl)
 curl -s "https://hub.docker.com/v2/repositories/<tu_usuario>/payment-service/tags"
-
-cd ..
 ```
 
 **Qué observar:** `docker push` completa exitosamente. Imagen aparece en Docker Hub.
@@ -451,19 +627,19 @@ cd ..
 
 ### Paso 13: Crear manifestos Kubernetes para payment-service
 
-**Qué hace:** Define Deployment y Service de payment-service en K8s.
+**Qué hace:** Define cómo se despliega payment-service en Kubernetes (Deployment y Service).
 
-**Por qué:** Necesitamos describir cómo correr payment-service en el clúster.
+**Por qué:** Los manifiestos YAML describen la configuración del clúster; son parte del proyecto.
 
-**Crear directorio `payment-service/k8s/`:**
+**Nota de transición:** Hasta ahora hemos desarrollado código Java en el IDE (Pasos 2-11) y compilado la imagen Docker (Paso 12). Ahora creamos los archivos de configuración Kubernetes que descri­ben cómo ejecutar la aplicación en el clúster. Estos también se crean en el IDE como archivos de proyecto.
 
-```bash
-mkdir -p payment-service/k8s
-```
+**Crear estructura de directorios:**
+
+En el IDE, desde la raíz del proyecto, crea la carpeta `payment-service/k8s/` (si no existe).
 
 **Crear archivo `payment-service/k8s/01-deployment.yaml`:**
 
-Genera el archivo con el siguiente contenido:
+En el IDE, dentro de `payment-service/k8s/`, crea el archivo `01-deployment.yaml` con el siguiente contenido:
 
 ```yaml
 apiVersion: apps/v1
@@ -528,9 +704,11 @@ spec:
               memory: 512Mi
 ```
 
+Guarda el archivo.
+
 **Crear archivo `payment-service/k8s/02-service.yaml`:**
 
-Genera el archivo con el siguiente contenido:
+En el IDE, crea el archivo `payment-service/k8s/02-service.yaml` con el siguiente contenido:
 
 ```yaml
 apiVersion: v1
@@ -551,9 +729,11 @@ spec:
       protocol: TCP
 ```
 
-**Qué observar:** Ambos archivos están creados. Nota que `imagePullPolicy: Always` fuerza pull de Docker Hub.
+Guarda el archivo.
 
-**Nota pedagógica:** `startupProbe` es importante para apps Java que tardan en iniciar. Da 60 segundos (30 reintentos x 2 segundos).
+**Qué observar:** Ambos archivos YAML están creados en el proyecto. Nota que `imagePullPolicy: Always` fuerza pull de Docker Hub y `spec.type: ClusterIP` implementa lo enseñado en Clase 3.1 (Service de capa 4 para acceso interno).
+
+**Nota pedagógica:** Los `*Probe` (liveness, readiness, startup) son los Health Checks que viste en Unidad 2. `startupProbe` es importante para apps Java que tardan en iniciar (da 60 segundos: 30 reintentos × 2 segundos).
 
 ---
 
