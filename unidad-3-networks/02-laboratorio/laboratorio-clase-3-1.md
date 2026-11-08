@@ -670,15 +670,9 @@ En Unidad 2 (Laboratorio 2.2) creaste manifiestos para `inventory-service` v1.0.
 | Service type | ClusterIP | ClusterIP | Acceso interno únicamente (Gateway expondrá externamente en Paso 18) |
 | Namespace | default | default | Ambos usan namespace default |
 
----
+**Crear el archivo:**
 
-### Crear estructura de directorios
-
-En el IDE, desde la raíz del proyecto, crea la carpeta `payment-service/k8s/` (si no existe).
-
-### Crear archivo `payment-service/k8s/deployment-service.yaml`
-
-En el IDE, dentro de `payment-service/k8s/`, crea el archivo `deployment-service.yaml` con el siguiente contenido:
+En el IDE, desde la raíz del proyecto, crea la carpeta `payment-service/k8s/` (si no existe). Dentro de `payment-service/k8s/`, crea el archivo `deployment-service.yaml` con el siguiente contenido:
 
 ```yaml
 apiVersion: apps/v1
@@ -772,9 +766,7 @@ spec:
 
 Guarda el archivo.
 
----
-
-### Qué observar en Paso 14
+**Qué observar:**
 
 **Archivo creado:**
 ```
@@ -809,7 +801,7 @@ Este es el mismo patrón que usaste en Unidad 2 Lab 2.2 para `inventory-service`
 |----------|-----------|-------------|
 | `type: ClusterIP` | Acceso interno únicamente (default) | No es accesible desde fuera del clúster (Gateway lo expondrá en Paso 18) |
 | `port: 80` | Puerto de escucha del Service | Los Pods internos usan este puerto para comunicarse |
-| `targetPort: http` | Puerto del contenedor (8080) | Service redirecciona puerto 80 → containerPort 8080 |
+| `targetPort: 8080` | Puerto del contenedor | Service redirecciona puerto 80 → containerPort 8080 |
 
 **Nota pedagógica - Continuidad con Unidad 2:**
 
