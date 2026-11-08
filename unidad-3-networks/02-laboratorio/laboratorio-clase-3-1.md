@@ -681,7 +681,6 @@ metadata:
   name: payment-service
   labels:
     app: payment-service
-    version: v1.0.0
 spec:
   replicas: 2
   strategy:
@@ -696,7 +695,6 @@ spec:
     metadata:
       labels:
         app: payment-service
-        version: v1.0.0
     spec:
       containers:
         - name: payment-service
