@@ -44,7 +44,7 @@ En Clase 3.1 aprendiste cómo Kubernetes expone servicios mediante **Services** 
 | Concepto de clase | Implementación en el laboratorio |
 |---|---|
 | **ClusterIP (Service)** | `catalog-service` e `inventory-service` usan ClusterIP (acceso interno). `payment-service` también usa ClusterIP internamente. |
-| **Comunicación inter-pod** | `payment-service` realiza llamadas HTTP reales a `catalog-service` e `inventory-service` usando nombres DNS internos (`catalog-service:80`, `inventory-service:80`). |
+| **Comunicación inter-pod** | `payment-service` realiza llamadas HTTP reales a `catalog-service` e `inventory-service` usando nombres DNS internos, todos en puerto 8080 (`catalog-service:8080`, `inventory-service:8080`). |
 | **Gateway API** | Exponemos `payment-service` públicamente mediante **Envoy Gateway** con recurso `Gateway` y `HTTPRoute`, con terminación TLS. |
 | **Caso de uso E-commerce** | Implementas el escenario exacto descrito en clase: 3 microservicios donde payment orquesta, catalog y inventory son internos, y payment es accesible externamente. |
 
@@ -101,7 +101,7 @@ Select-String "<version>" inventory-service/pom.xml | Select-Object -First 1
 
 > **Importante - Continuidad con U2:** En las unidades previas **no se modificó la versión del `pom.xml`**. En la Unidad 2 (Lab 2.2, Paso 8) el inventory-service pasó a `1.1.0` solo en el código Java (`"v1.1.0"`) y en el tag de la imagen Docker; el `pom.xml` se quedó en `1.0.0-SNAPSHOT`. Por eso aquí **no verás `1.1.0` en el pom.xml**: es lo esperado, no un error. Esta es la primera vez que actualizamos la versión del `pom.xml` (Paso 2).
 >
-> **Nota sobre manifiestos heredados:** Los directorios `catalog-service/k8s/` e `inventory-service/k8s/` ya existen del Laboratorio 2.2 de Unidad 2. En Paso 5 actualizaremos el manifiesto de inventory-service a v1.2.0. En Paso 15 crearemos manifiestos nuevos para payment-service. En Paso 16 (Desplegar), desplegaremos los 3 servicios: catalog e inventory (heredados de U2 pero inventory actualizado a v1.2.0) y payment-service (nuevo). La reutilización de componentes es la esencia del desarrollo iterativo: cada unidad construye sobre la anterior.
+> **Nota sobre manifiestos heredados:** Los directorios `catalog-service/k8s/` e `inventory-service/k8s/` ya existen del Laboratorio 2.2 de Unidad 2. En Paso 5 actualizaremos el manifiesto de inventory-service a v1.2.0 **y normalizaremos su puerto a 8080**. En Paso 15 crearemos manifiestos nuevos para payment-service (también en puerto 8080). En Paso 16 (Desplegar), desplegaremos los 3 servicios con puertos consistentes: todos en 8080. La reutilización y mejora iterativa de componentes es la esencia del desarrollo: cada unidad construye y perfecciona lo anterior.
 
 ---
 
@@ -227,29 +227,59 @@ docker inspect <tu_usuario>/inventory-service:1.2.0
 
 ### Paso 5: Actualizar manifiesto de inventory-service a v1.2.0
 
-**Qué hace:** Modificar el archivo `deployment-service.yaml` heredado de U2 para usar la imagen v1.2.0 que acabamos de compilar.
+**Qué hace:** Modificar el archivo `deployment-service.yaml` heredado de U2 para usar la imagen v1.2.0 que acabamos de compilar y normalizar el puerto a 8080.
 
-**Por qué:** El manifest de U2 todavía referencia `inventory-service:1.0.0`. Como compilamos v1.2.0 con el nuevo endpoint `/reserve`, el manifest debe actualizarse para usar esa versión.
+**Por qué:** El manifest de U2 todavía referencia `inventory-service:1.0.0`. Como compilamos v1.2.0 con el nuevo endpoint `/reserve`, el manifest debe actualizarse para usar esa versión. Además, es el momento perfecto para normalizar el puerto a 8080, igual que catalog-service y payment-service, para consistencia en U3.
 
 **Modificar el archivo:**
 
-En el IDE, abre `inventory-service/k8s/deployment-service.yaml`. Busca la línea que dice:
+En el IDE, abre `inventory-service/k8s/deployment-service.yaml`. Realiza dos cambios:
 
+1. Busca la línea que dice:
 ```yaml
 image: <tu-usuario-dockerhub>/inventory-service:1.0.0
 ```
-
 Reemplázala por:
-
 ```yaml
 image: <tu-usuario-dockerhub>/inventory-service:1.2.0
 ```
 
+2. Busca la sección `Service` (al final del archivo), específicamente esta parte:
+```yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service
+  labels:
+    app: inventory-service
+spec:
+  type: ClusterIP
+  selector:
+    app: inventory-service
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+```
+
+Cambia `port: 80` a `port: 8080`:
+```yaml
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+```
+
 Guarda el archivo.
 
-**Qué observar:** El archivo ahora referencia la imagen v1.2.0. Cuando desplegemos en Paso 16, Kubernetes tirará esta versión (con el endpoint nuevo `/reserve`).
+**Qué observar:** El archivo ahora referencia la imagen v1.2.0 y expone puerto 8080. Cuando desplegemos en Paso 16, Kubernetes tirará esta versión (con el endpoint nuevo `/reserve`) en el puerto correcto.
 
-**Nota pedagógica:** Este es un patrón común: cada vez que compilas una nueva versión de un servicio, necesitas actualizar su manifiesto Kubernetes para que use esa versión. En sistemas CI/CD reales, esto se automatiza, pero aquí lo hacemos manualmente para entender el flujo.
+**Nota pedagógica:** Este paso hace dos cosas importantes:
+1. **Versionado de imágenes**: Cada cambio de código → nueva versión → manifiesto actualizado. Este es el ciclo vida de un servicio en producción.
+2. **Normalización**: Normalizamos los puertos de todos los servicios a 8080 (catalog, inventory, payment), lo que simplifica la configuración y la comunicación inter-pod. Esta es una decisión arquitectónica común en nuevas versiones de sistemas.
 
 ---
 
@@ -363,7 +393,7 @@ Guarda el archivo.
 
 **Qué observar:** Esta es una interfaz JAX-RS que actúa como cliente HTTP dentro de payment-service. La anotación `@RegisterRestClient(configKey = "catalog-api")` vincula esta interfaz con la configuración en `application.properties` (que haremos en Paso 11). MicroProfile inyecta automáticamente la implementación en runtime.
 
-**Nota pedagógica:** Esta clase se ejecuta **dentro de payment-service**, pero se conecta a `catalog-service:80` (nombre DNS interno de Kubernetes del servicio catalog). Este es el patrón de **comunicación inter-pod**: un Pod de payment-service busca otro Pod de catalog-service usando el nombre del Service interno.
+**Nota pedagógica:** Esta clase se ejecuta **dentro de payment-service**, pero se conecta a `catalog-service:8080` (nombre DNS interno de Kubernetes del servicio catalog). Este es el patrón de **comunicación inter-pod**: un Pod de payment-service busca otro Pod de catalog-service usando el nombre del Service interno.
 
 ---
 
@@ -413,7 +443,7 @@ Guarda el archivo.
 
 **Qué observar:** Esta es una interfaz JAX-RS que actúa como cliente HTTP dentro de payment-service. La anotación `@RegisterRestClient(configKey = "inventory-api")` vincula esta interfaz con la configuración en `application.properties` (que haremos en Paso 11). MicroProfile inyecta automáticamente la implementación en runtime.
 
-**Nota pedagógica:** Esta clase se ejecuta **dentro de payment-service**, pero se conecta a `inventory-service:80` (nombre DNS interno de Kubernetes del servicio inventory). Ambos clientes (CatalogClient e InventoryClient) siguen el patrón de **comunicación inter-pod**: un Pod de payment-service busca otros Pods de catalog e inventory usando los nombres de los Services internos.
+**Nota pedagógica:** Esta clase se ejecuta **dentro de payment-service**, pero se conecta a `inventory-service:8080` (nombre DNS interno de Kubernetes del servicio inventory). Ambos clientes (CatalogClient e InventoryClient) siguen el patrón de **comunicación inter-pod**: un Pod de payment-service busca otros Pods de catalog e inventory usando los nombres de los Services internos en puerto 8080.
 
 ---
 
@@ -570,15 +600,19 @@ quarkus.application.version=1.0.0
 quarkus.smallrye-health.root-path=/health
 
 # REST Client configuration for catalog-service
-quarkus.rest-client."catalog-api".url=http://catalog-service:80
+quarkus.rest-client."catalog-api".url=http://catalog-service:8080
 
 # REST Client configuration for inventory-service
-quarkus.rest-client."inventory-api".url=http://inventory-service:80
+quarkus.rest-client."inventory-api".url=http://inventory-service:8080
 ```
 
 Guarda el archivo.
 
-**Qué observar:** Las URLs de los clientes HTTP (`catalog-api` e `inventory-api`) están configuradas con nombres DNS internos de Kubernetes (`catalog-service:80`, `inventory-service:80`). Kubernetes CoreDNS resuelve automáticamente estos nombres a las IPs de los Services.
+**Qué observar:** Las URLs de los clientes HTTP (`catalog-api` e `inventory-api`) usan nombres DNS internos de Kubernetes, ambos en puerto 8080:
+- `catalog-service:8080`
+- `inventory-service:8080`
+
+Kubernetes CoreDNS resuelve automáticamente estos nombres a las IPs de los Services correspondientes.
 
 **Nota pedagógica:** Las propiedades con `quarkus.rest-client` se mapean a las interfaces `@RegisterRestClient` que definimos en los Pasos 7-8 mediante el parámetro `configKey`.
 
@@ -770,7 +804,7 @@ spec:
   selector:
     app: payment-service
   ports:
-    - port: 80
+    - port: 8080
       targetPort: 8080
       protocol: TCP
       name: http
@@ -812,8 +846,8 @@ Este es el mismo patrón que usaste en Unidad 2 Lab 2.2 para `inventory-service`
 | Elemento | Propósito | Observación |
 |----------|-----------|-------------|
 | `type: ClusterIP` | Acceso interno únicamente (default) | No es accesible desde fuera del clúster (Gateway lo expondrá en Paso 18) |
-| `port: 80` | Puerto de escucha del Service | Los Pods internos usan este puerto para comunicarse |
-| `targetPort: 8080` | Puerto del contenedor | Service redirecciona puerto 80 → containerPort 8080 |
+| `port: 8080` | Puerto de escucha del Service | Los Pods internos usan este puerto para comunicarse |
+| `targetPort: 8080` | Puerto del contenedor | Service redirecciona puerto 8080 → containerPort 8080 |
 
 **Nota pedagógica - Continuidad con Unidad 2:**
 
