@@ -395,9 +395,9 @@ Guarda el archivo.
 
 **Por qué:** Centraliza la lógica de negocio e integra los dos clientes HTTP con resiliencia (`@Timeout`, `@Retry`).
 
-**Modificar el archivo:**
+**Crear el archivo:**
 
-En el IDE, crea el archivo `src/main/java/com/ecom/payment/PaymentService.java`. Agrega el siguiente contenido:
+En el IDE, dentro del proyecto `payment-service`, crea el archivo `src/main/java/com/ecom/payment/PaymentService.java`. Agrega el siguiente contenido:
 
 ```java
 package com.ecom.payment;
