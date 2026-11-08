@@ -209,6 +209,8 @@ cd proyecto-base-unidad-03
 mvn io.quarkus.platform:quarkus-maven-plugin:3.40.1.1:create \
   -DprojectGroupId=com.ecom \
   -DprojectArtifactId=payment-service \
+  -DclassName="com.ecom.payment.PaymentResource" \
+  -Dpath="/v1/payments" \
   -Dextensions="rest-jackson,smallrye-health,smallrye-fault-tolerance,rest-client-jackson"
 
 # Ingresa al directorio nuevo
@@ -227,6 +229,8 @@ cd proyecto-base-unidad-03
 mvn io.quarkus.platform:quarkus-maven-plugin:3.40.1.1:create `
   -DprojectGroupId=com.ecom `
   -DprojectArtifactId=payment-service `
+  -DclassName="com.ecom.payment.PaymentResource" `
+  -Dpath="/v1/payments" `
   -Dextensions="rest-jackson,smallrye-health,smallrye-fault-tolerance,rest-client-jackson"
 
 cd payment-service
@@ -237,36 +241,22 @@ Select-String "<version>" pom.xml | Select-Object -First 2
 ```
 
 **Qué observar:** Se crea directorio `payment-service/` con:
-- `pom.xml` (con version `999-SNAPSHOT`)
+- `pom.xml` (con version `1.0.0-SNAPSHOT`)
 - `src/main/java/com/ecom/payment/`
 - `Dockerfile`
 - `mvnw`, `mvnw.cmd`
 
 ---
 
-### Paso 6: Actualizar pom.xml de payment-service a versión 1.0.0
+### Paso 6: Abrir payment-service en el IDE y actualizar pom.xml a versión 1.0.0
 
 **Qué hace:** Cambia version de SNAPSHOT a 1.0.0 de producción.
 
 **Por qué:** No publicamos SNAPSHOT a Docker Hub; usamos versiones semánticas estables.
 
-![linux](images/linux.png) **Linux/macOS:**
+**Modificar el archivo:**
 
-```bash
-# Reemplaza version en payment-service/pom.xml
-sed -i.bak 's/<version>999-SNAPSHOT<\/version>/<version>1.0.0<\/version>/' pom.xml
-
-# Verifica
-grep "<version>" pom.xml | head -1
-```
-
-![win](images/windows.png) **Windows (PowerShell):**
-
-```powershell
-(Get-Content pom.xml) -replace '999-SNAPSHOT', '1.0.0' | Set-Content pom.xml
-
-Select-String "<version>" pom.xml | Select-Object -First 1
-```
+En el IDE, abre el directorio `payment-service` que acabas de crear. Localiza y abre `pom.xml`. Busca la línea `<version>1.0.0-SNAPSHOT</version>` (normalmente es la primera etiqueta `version` después de `<modelVersion>`). Reemplázala por `<version>1.0.0</version>` y guarda el archivo.
 
 **Qué observar:** pom.xml ahora muestra `<version>1.0.0</version>`.
 
@@ -278,9 +268,9 @@ Select-String "<version>" pom.xml | Select-Object -First 1
 
 **Por qué:** Es la "puerta de entrada" de payment-service; orquesta las llamadas a otros servicios.
 
-**Crear archivo `src/main/java/com/ecom/payment/PaymentResource.java`:**
+**Modificar el archivo:**
 
-Genera el archivo con el siguiente contenido:
+En el IDE, crea el archivo `src/main/java/com/ecom/payment/PaymentResource.java` (reemplazando el que generó Maven). Agrega el siguiente contenido:
 
 ```java
 package com.ecom.payment;
@@ -330,9 +320,11 @@ public class PaymentResource {
 }
 ```
 
-**Qué observar:** Archivo compilable sin errores. Usa `@Path("/v1/payments")` e inyecta `PaymentService`.
+Guarda el archivo.
 
-**Nota pedagógica:** Observe que el POST devuelve transactionId único (UUID truncado). En producción, esto se guardería en BD.
+**Qué observar:** El archivo es compilable y define el endpoint `@POST /v1/payments`. Nota que inyecta `PaymentService` (la crearemos en el Paso 8) y retorna transactionId único (UUID truncado) junto con el estado de la operación.
+
+**Nota pedagógica:** En producción, este transactionId se almacenaría en una base de datos para auditoría y trazabilidad de transacciones.
 
 ---
 
