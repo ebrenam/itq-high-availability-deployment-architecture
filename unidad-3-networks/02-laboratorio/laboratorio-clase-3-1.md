@@ -101,7 +101,7 @@ Select-String "<version>" inventory-service/pom.xml | Select-Object -First 1
 
 > **Importante - Continuidad con U2:** En las unidades previas **no se modificó la versión del `pom.xml`**. En la Unidad 2 (Lab 2.2, Paso 8) el inventory-service pasó a `1.1.0` solo en el código Java (`"v1.1.0"`) y en el tag de la imagen Docker; el `pom.xml` se quedó en `1.0.0-SNAPSHOT`. Por eso aquí **no verás `1.1.0` en el pom.xml**: es lo esperado, no un error. Esta es la primera vez que actualizamos la versión del `pom.xml` (Paso 2).
 >
-> **Nota sobre manifiestos heredados:** Los directorios `catalog-service/k8s/` e `inventory-service/k8s/` ya existen del Laboratorio 2.2 de Unidad 2. En Paso 14 (Desplegar), usaremos los manifiestos heredados de U2 para catalog e inventory, y los nuevos manifiestos que crees en Paso 13 para payment-service. La reutilización de componentes es la esencia del desarrollo iterativo: cada unidad construye sobre la anterior.
+> **Nota sobre manifiestos heredados:** Los directorios `catalog-service/k8s/` e `inventory-service/k8s/` ya existen del Laboratorio 2.2 de Unidad 2. En Paso 15 (Desplegar), usaremos los manifiestos heredados de U2 para catalog e inventory, y los nuevos manifiestos que crees en Paso 14 para payment-service. La reutilización de componentes es la esencia del desarrollo iterativo: cada unidad construye sobre la anterior.
 
 ---
 
@@ -556,9 +556,50 @@ Guarda el archivo.
 
 ---
 
-### Paso 12: Compilar payment-service y publicar a Docker Hub
+### Paso 12: Crear Dockerfile para payment-service
 
-**Qué hace:** Compila JAR, crea imagen Docker, publica como v1.0.0.
+**Qué hace:** Define cómo empaquetar payment-service en una imagen Docker lista para Kubernetes.
+
+**Por qué:** Docker empaqueta solo el JAR compilado (sin herramientas de build), reduciendo tamaño y riesgo de seguridad. Usamos la misma imagen base que en Unidad 2.
+
+**Crear el archivo:**
+
+En el IDE, en la raíz de `payment-service/`, crea el archivo `Dockerfile` con el siguiente contenido:
+
+```dockerfile
+FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24
+
+ENV LANGUAGE='en_US:en'
+
+# We make four distinct layers so if there are application changes the library layers can be re-used
+COPY --chown=185 target/quarkus-app/lib/ /deployments/lib/
+COPY --chown=185 target/quarkus-app/*.jar /deployments/
+COPY --chown=185 target/quarkus-app/app/ /deployments/app/
+COPY --chown=185 target/quarkus-app/quarkus/ /deployments/quarkus/
+
+EXPOSE 8080
+USER 185
+ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"
+
+ENTRYPOINT [ "/opt/jboss/container/java/run/run-java.sh" ]
+```
+
+Guarda el archivo.
+
+**Qué observar:** Este Dockerfile es idéntico al de Unidad 2 (inventory-service). Usa:
+- **Red Hat UBI9** como imagen base (runtime-only, sin herramientas de build)
+- **Multi-layer copy** para optimizar cachés de Docker
+- **USER 185** por razones de seguridad (non-root)
+- **EXPOSE 8080** porque Quarkus corre en ese puerto
+
+**Nota pedagógica:** Es el mismo Dockerfile usado en toda la plataforma (catalog, inventory, payment). La consistencia en tooling reduce sorpresas.
+
+---
+
+### Paso 13: Compilar y publicar payment-service v1.0.0 a Docker Hub
+
+**Qué hace:** Compila el JAR, crea imagen Docker con el Dockerfile del Paso 12, publica como v1.0.0.
 
 **Por qué:** Es la versión lista para desplegar en Kubernetes.
 
@@ -571,7 +612,7 @@ mvn clean package -DskipTests
 # Verifica JAR
 ls -la target/quarkus-app/
 
-# Construir imagen
+# Construir imagen (usa el Dockerfile creado en Paso 12)
 docker build -t <tu_usuario>/payment-service:1.0.0 .
 
 # Publicar
@@ -579,9 +620,6 @@ docker push <tu_usuario>/payment-service:1.0.0
 
 # Verifica en Docker Hub
 curl -s "https://hub.docker.com/v2/repositories/<tu_usuario>/payment-service/tags" | grep "1.0.0"
-
-# Volver al directorio proyecto
-cd ..
 ```
 
 ![win](images/windows.png) **Windows (PowerShell):**
@@ -605,13 +643,13 @@ curl -s "https://hub.docker.com/v2/repositories/<tu_usuario>/payment-service/tag
 
 ---
 
-### Paso 13: Crear manifestos Kubernetes para payment-service
+### Paso 14: Crear manifestos Kubernetes para payment-service
 
 **Qué hace:** Define cómo se despliega payment-service en Kubernetes (Deployment y Service).
 
 **Por qué:** Los manifiestos YAML describen la configuración del clúster; son parte del proyecto.
 
-**Nota de transición:** Hasta ahora hemos desarrollado código Java en el IDE (Pasos 2-11) y compilado la imagen Docker (Paso 12). Ahora creamos los archivos de configuración Kubernetes que descri­ben cómo ejecutar la aplicación en el clúster. Estos también se crean en el IDE como archivos de proyecto.
+**Nota de transición:** Hasta ahora hemos desarrollado código Java en el IDE (Pasos 2-11), creado el Dockerfile (Paso 12), y compilado + publicado la imagen Docker (Paso 13). Ahora creamos los archivos de configuración Kubernetes que describen cómo ejecutar la aplicación en el clúster. Estos también se crean en el IDE como archivos de proyecto.
 
 **Crear estructura de directorios:**
 
@@ -717,7 +755,7 @@ Guarda el archivo.
 
 ---
 
-### Paso 14: Desplegar los 3 servicios en Kubernetes
+### Paso 15: Desplegar los 3 servicios en Kubernetes
 
 **Qué hace:** Aplica manifiestos de catalog, inventory, y payment al clúster.
 
@@ -794,7 +832,7 @@ kubectl get svc -n production
 
 ---
 
-### Paso 15: Probar comunicación inter-servicios (sin Gateway aún)
+### Paso 16: Probar comunicación inter-servicios (sin Gateway aún)
 
 **Qué hace:** Verifica que payment-service puede alcanzar catalog e inventory internamente.
 
@@ -838,7 +876,7 @@ kubectl exec -it $POD_NAME -n production -- curl -X POST http://payment-service:
 
 ---
 
-### Paso 16: Instalar Envoy Gateway y crear Gateway API
+### Paso 17: Instalar Envoy Gateway y crear Gateway API
 
 **Qué hace:** Instala Envoy Gateway Controller y recursos de Gateway API.
 
@@ -892,7 +930,7 @@ kubectl get pods -n envoy-gateway-system
 
 ---
 
-### Paso 17: Crear certificado TLS y configurar Gateway + HTTPRoute
+### Paso 18: Crear certificado TLS y configurar Gateway + HTTPRoute
 
 **Qué hace:** Genera certificado autofirmado, lo monta en Secret K8s, y configura enrutamiento externo.
 
@@ -1036,7 +1074,7 @@ kubectl describe gateway payment-gateway -n production
 
 ---
 
-### Paso 18: Probar acceso externo con TLS
+### Paso 19: Probar acceso externo con TLS
 
 **Qué hace:** Accede a payment-service desde fuera del clúster via HTTPS usando Gateway.
 
