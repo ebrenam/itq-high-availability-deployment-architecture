@@ -656,20 +656,6 @@ curl -s "https://hub.docker.com/v2/repositories/<tu_usuario>/payment-service/tag
 
 **Nota de transición:** Hasta ahora hemos desarrollado código Java en el IDE (Pasos 2-11), creado el Dockerfile (Paso 12), y compilado + publicado la imagen Docker (Paso 13). Ahora creamos los archivos de configuración Kubernetes que describen cómo ejecutar la aplicación en el clúster. Estos también se crean en el IDE como archivos de proyecto.
 
-**Contexto - Diferencias con Unidad 2:**
-
-En Unidad 2 (Laboratorio 2.2) creaste manifiestos para `inventory-service` v1.0.0. Aquí creamos manifiestos para `payment-service` v1.0.0. Ambos siguen el mismo patrón de resiliencia:
-
-| Aspecto | U2: inventory-service | U3: payment-service | Razón |
-|--------|-------|--------|------|
-| Replicas | 2 | 2 | Alta disponibilidad |
-| Health Checks | 3 tipos (/health/started, /health/ready, /health/live) | 3 tipos (rutas diferentes: /health/startup, /health/ready, /health/live) | Mismo mecanismo, nomenclatura de Quarkus |
-| RollingUpdate | maxSurge: 1, maxUnavailable: 0 | maxSurge: 1, maxUnavailable: 0 | Cero-downtime updates (heredado de U2) |
-| imagePullPolicy | Always | Always | Asegurar última versión en Docker Hub |
-| Resources (CPU/Memory) | 100m / 256Mi (requests), 500m / 512Mi (limits) | 100m / 256Mi (requests), 500m / 512Mi (limits) | QoS estándar para microservicios |
-| Service type | ClusterIP | ClusterIP | Acceso interno únicamente (Gateway expondrá externamente en Paso 18) |
-| Namespace | default | default | Ambos usan namespace default |
-
 **Crear el archivo:**
 
 En el IDE, desde la raíz del proyecto, crea la carpeta `payment-service/k8s/` (si no existe). Dentro de `payment-service/k8s/`, crea el archivo `deployment-service.yaml` con el siguiente contenido:
