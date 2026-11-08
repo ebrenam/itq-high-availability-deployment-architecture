@@ -478,15 +478,15 @@ Guarda el archivo.
 
 ---
 
-### Paso 10: Crear PaymentResource (REST endpoint)
+### Paso 10: Reemplazar PaymentResource (REST endpoint)
 
-**Qué hace:** Define el endpoint HTTP `/v1/payments` que expone el servicio de pagos.
+**Qué hace:** Redefine el endpoint HTTP `/v1/payments` que expone el servicio de pagos.
 
-**Por qué:** Es la "puerta de entrada" de payment-service; los clientes (internos o externos) llaman a este endpoint.
+**Por qué:** Maven generó una plantilla básica; necesitamos reemplazarla con la implementación real que delega a PaymentService.
 
 **Modificar el archivo:**
 
-En el IDE, crea el archivo `src/main/java/com/ecom/payment/PaymentResource.java` (reemplazando el que generó Maven). Agrega el siguiente contenido:
+En el IDE, abre el archivo `src/main/java/com/ecom/payment/PaymentResource.java` (generado por Maven en Paso 5). Reemplaza todo su contenido con lo siguiente:
 
 ```java
 package com.ecom.payment;
