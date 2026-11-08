@@ -514,7 +514,7 @@ Guarda el archivo.
 
 **Modificar el archivo:**
 
-En el IDE, abre el archivo `src/main/java/com/ecom/payment/PaymentResource.java` (generado por Maven en Paso 5). Reemplaza todo su contenido con lo siguiente:
+En el IDE, abre el archivo `src/main/java/com/ecom/payment/PaymentResource.java` (generado por Maven en Paso 6). Reemplaza todo su contenido con lo siguiente:
 
 ```java
 package com.ecom.payment;
@@ -627,7 +627,7 @@ Guarda el archivo.
 
 ### Paso 14: Compilar y publicar payment-service v1.0.0 a Docker Hub
 
-**Qué hace:** Compila el JAR, crea imagen Docker con el Dockerfile del Paso 12, publica como v1.0.0.
+**Qué hace:** Compila el JAR, crea imagen Docker con el Dockerfile del Paso 13, publica como v1.0.0.
 
 **Por qué:** Es la versión lista para desplegar en Kubernetes.
 
@@ -640,7 +640,7 @@ mvn clean package -DskipTests
 # Verifica JAR
 ls -la target/quarkus-app/
 
-# Construir imagen (usa el Dockerfile creado en Paso 12)
+# Construir imagen (usa el Dockerfile creado en Paso 13)
 docker build -t <tu_usuario>/payment-service:1.0.0 .
 
 # Publicar
@@ -682,7 +682,7 @@ curl -s "https://hub.docker.com/v2/repositories/<tu_usuario>/payment-service/tag
 - Si un Pod sigue vivo o se quedó colgado (liveness probe)
 - Cómo exponer el servicio internamente (ClusterIP para comunicación inter-pod)
 
-**Nota de transición:** Hasta ahora hemos desarrollado código Java en el IDE (Pasos 2-11), creado el Dockerfile (Paso 12), y compilado + publicado la imagen Docker (Paso 13). Ahora creamos los archivos de configuración Kubernetes que describen cómo ejecutar la aplicación en el clúster. Estos también se crean en el IDE como archivos de proyecto.
+**Nota de transición:** Hasta ahora hemos desarrollado código Java en el IDE (Pasos 2-12), creado el Dockerfile (Paso 13), y compilado + publicado la imagen Docker (Paso 14). Ahora creamos los archivos de configuración Kubernetes que describen cómo ejecutar la aplicación en el clúster. Estos también se crean en el IDE como archivos de proyecto.
 
 **Crear el archivo:**
 
