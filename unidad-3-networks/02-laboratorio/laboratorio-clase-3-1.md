@@ -341,7 +341,7 @@ Guarda el archivo.
 
 ### Paso 8: Crear InventoryClient (cliente HTTP a inventory-service)
 
-**Qué hace:** Define el cliente HTTP que POST a `/v1/inventory/reserve` en inventory-service.
+**Qué hace:** Define el cliente HTTP que llama a `POST /v1/inventory/reserve` en inventory-service.
 
 **Por qué:** payment-service debe reservar stock disponible antes de procesar un pago.
 
