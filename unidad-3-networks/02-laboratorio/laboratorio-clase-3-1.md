@@ -494,8 +494,6 @@ package com.ecom.payment;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
-import java.time.Instant;
-import java.util.UUID;
 
 @Path("/v1/payments")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -506,38 +504,15 @@ public class PaymentResource {
     PaymentService paymentService;
 
     @POST
-    public PaymentResponse processPayment(PaymentService.PaymentRequest request) {
-        try {
-            return paymentService.processPayment(request);
-        } catch (Exception e) {
-            String transactionId = UUID.randomUUID().toString().substring(0, 12);
-            return new PaymentResponse(
-                transactionId,
-                "FAILED",
-                request.productId(),
-                request.quantity(),
-                request.amount(),
-                "Endpoint error: " + e.getMessage(),
-                Instant.now()
-            );
-        }
+    public PaymentService.PaymentResponse processPayment(PaymentService.PaymentRequest request) {
+        return paymentService.processPayment(request);
     }
-
-    public record PaymentResponse(
-        String transactionId,
-        String status,
-        String productId,
-        int quantity,
-        double amount,
-        String message,
-        Instant timestamp
-    ) {}
 }
 ```
 
 Guarda el archivo.
 
-**Qué observar:** Es un controlador REST simple que inyecta `PaymentService` y delega la lógica. Sigue el patrón de arquitectura en capas: Resource (HTTP) → Service (lógica) → Clients (integración).
+**Qué observar:** Este es un controlador REST minimalista que inyecta `PaymentService` y delega toda la lógica. Nota que usa `PaymentService.PaymentRequest` y `PaymentService.PaymentResponse` (no define sus propios records). Sigue el patrón de arquitectura en capas: Resource (HTTP) → Service (lógica) → Clients (integración).
 
 **Nota pedagógica:** Nota que ahora el flujo es claro desde abajo hacia arriba: primero definimos los clientes (Pasos 7-8) que hablan con otros servicios, luego el servicio (Paso 9) que orquesta, finalmente el controlador (Paso 10) que expone.
 
