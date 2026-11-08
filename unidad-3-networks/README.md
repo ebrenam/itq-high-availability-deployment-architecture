@@ -1,4 +1,4 @@
-# 🔒 Unidad 3: Redes de servicio, balanceo y seguridad
+# Unidad 3: Redes de servicio, balanceo y seguridad
 
 ## Objetivos de aprendizaje
 

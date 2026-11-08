@@ -68,38 +68,23 @@ Select-String "<version>" catalog-service/pom.xml | Select-Object -First 1
 Select-String "<version>" inventory-service/pom.xml | Select-Object -First 1
 ```
 
-**Qué observar:** Ambas carpetas existen con archivos pom.xml legibles. Las versiones deben ser 1.0.0 (catalog) y 1.1.0 (inventory).
+**Qué observar:** Ambas carpetas existen con archivos pom.xml legibles. Las versiones deben ser `1.0.0` (catalog) y `1.0.0-SNAPSHOT` (inventory).
+
+> **Importante:** En las unidades previas **no se modificó la versión del `pom.xml`**. En la Unidad 2 (Lab 2.2, Paso 8) el inventory-service pasó a `1.1.0` solo en el código Java (`"v1.1.0"`) y en el tag de la imagen Docker; el `pom.xml` se quedó en `1.0.0-SNAPSHOT`. Por eso aquí **no verás `1.1.0` en el pom.xml**: es lo esperado, no un error. Esta es la primera vez que actualizamos la versión del `pom.xml` (Paso 2).
 
 ---
 
-### Paso 2: Actualizar inventory-service a v1.2.0 - Modificar pom.xml
+### Paso 2: Abrir el proyecto inventory-service y actualizar pom.xml a la versión 1.2.0
 
-**Qué hace:** Cambia la versión y prepara para agregar nueva funcionalidad.
+**Qué hace:** Cambia la versión del pom.xml y prepara para agregar nueva funcionalidad.
 
 **Por qué:** Semantic versioning: MINOR bump para endpoint nuevo backward-compatible.
 
-![linux](images/linux.png) **Linux/macOS:**
+**Modificar el archivo:**
 
-```bash
-# Abre el archivo pom.xml en tu editor
-nano inventory-service/pom.xml
+Abre el proyecto completo en tu IDE (`unidad-3-networks/02-laboratorio/proyecto-base-unidad-03`). Los próximos pasos requerirán múltiples modificaciones en varios archivos, así que mantén el proyecto abierto.
 
-# O, directamente con sed (reemplaza 1.0.0-SNAPSHOT por 1.2.0):
-sed -i.bak 's/<version>1\.0\.0-SNAPSHOT<\/version>/<version>1.2.0<\/version>/' inventory-service/pom.xml
-
-# Verifica el cambio
-grep "<version>" inventory-service/pom.xml | head -1
-```
-
-![win](images/windows.png) **Windows (PowerShell):**
-
-```powershell
-# Abre en editor y modifica manualmente, o:
-(Get-Content inventory-service/pom.xml) -replace '1\.0\.0-SNAPSHOT', '1.2.0' | Set-Content inventory-service/pom.xml
-
-# Verifica
-Select-String "<version>" inventory-service/pom.xml | Select-Object -First 1
-```
+Desde el IDE, abre `inventory-service/pom.xml`. Localiza la línea `<version>1.0.0-SNAPSHOT</version>` (normalmente es la primera etiqueta `version` después de `<modelVersion>`). Reemplázala por `<version>1.2.0</version>` y guarda el archivo.
 
 **Qué observar:** El pom.xml ahora muestra `<version>1.2.0</version>`.
 
@@ -113,17 +98,9 @@ Select-String "<version>" inventory-service/pom.xml | Select-Object -First 1
 
 **Por qué:** payment-service necesitará reservar stock antes de procesar pagos.
 
-**Abrir archivo y ver contenido actual:**
+**Modificar el archivo:**
 
-```bash
-cat inventory-service/src/main/java/com/ecom/inventory/InventoryResource.java
-```
-
-**Agregar método a InventoryResource:**
-
-Abre el archivo `inventory-service/src/main/java/com/ecom/inventory/InventoryResource.java` en tu editor (VS Code, Vi, nano). 
-
-Ubica el cierre de la clase (antes de la última `}`). Agrega el siguiente código:
+Abre `inventory-service/src/main/java/com/ecom/inventory/InventoryResource.java`. Ubica el cierre de la clase (antes de la última `}`). Agrega el siguiente código:
 
 ```java
 
@@ -156,7 +133,7 @@ Ubica el cierre de la clase (antes de la última `}`). Agrega el siguiente códi
     ) {}
 ```
 
-> **Nota:** Copia el código anterior, pégalo en el archivo antes del cierre de la clase. Guarda con Ctrl+S (o Cmd+S en macOS).
+Guarda el archivo.
 
 **Qué observar:** El archivo ahora tiene dos métodos: `@GET /inventory` (heredado) y `@POST /reserve` (nuevo).
 

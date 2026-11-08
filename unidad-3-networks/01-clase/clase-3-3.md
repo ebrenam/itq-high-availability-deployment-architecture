@@ -54,7 +54,7 @@ Imagina la seguridad de un hotel de alta gama:
 
 ---
 
-## 3. Arquitectura de eguridad multinivel
+## 3. Arquitectura de seguridad multinivel
 
 Kubernetes implementa **4 capas de seguridad independientes** que se aplican en secuencia. Cada capa es un "checkpoint" que debe pasar para que una solicitud tenga éxito.
 
