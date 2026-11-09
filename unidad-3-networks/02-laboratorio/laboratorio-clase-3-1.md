@@ -99,7 +99,7 @@ Select-String "<version>" inventory-service/pom.xml | Select-Object -First 1
 
 **Qué observar:** Ambas carpetas existen con archivos pom.xml legibles. Las versiones deben ser `1.0.0` (catalog) y `1.0.0-SNAPSHOT` (inventory).
 
-> **Importante - Continuidad con U2:** En las unidades previas **no se modificó la versión del `pom.xml`**. En la Unidad 2 (Lab 2.2, Paso 8) el inventory-service pasó a `1.1.0` solo en el código Java (`"v1.1.0"`) y en el tag de la imagen Docker; el `pom.xml` se quedó en `1.0.0-SNAPSHOT`. Por eso aquí **no verás `1.1.0` en el pom.xml**: es lo esperado, no un error. Esta es la primera vez que actualizamos la versión del `pom.xml` (Paso 2).
+> **Importante - Continuidad con U2:** En las unidades previas **no se modificó la versión del `pom.xml`**. En la Unidad 2 (Lab 2.2, Paso 8) el inventory-service pasó a `1.1.0` solo en el código Java (`"v1.1.0"`) y en el tag de la imagen Docker; el `pom.xml` se quedó en `1.0.0-SNAPSHOT`. Por eso aquí **no verás `1.1.0` en el pom.xml**: es lo esperado, no un error. Esta es la primera vez que actualizamos la versión del `pom.xml`.
 >
 > **Nota sobre manifiestos heredados:** Los directorios `catalog-service/k8s/` e `inventory-service/k8s/` ya existen del Laboratorio 2.2 de Unidad 2. En Paso 5 actualizaremos el manifiesto de inventory-service a v1.2.0 **y normalizaremos su puerto a 8080**. En Paso 16 crearemos manifiestos nuevos para payment-service (también en puerto 8080). En Paso 17 (Desplegar), desplegaremos los 3 servicios con puertos consistentes: todos en 8080. La reutilización y mejora iterativa de componentes es la esencia del desarrollo: cada unidad construye y perfecciona lo anterior.
 
@@ -545,7 +545,7 @@ Guarda el archivo.
 
 **Qué hace:** Define un health check que valida si la aplicación arrancó correctamente, usado por Kubernetes en el startup probe.
 
-**Por qué:** El `startupProbe` en el manifiesto (Paso 16) pregunta periódicamente si el servicio está listo. Sin este check, Kubernetes no puede confirmar que la JVM arrancó.
+**Por qué:** El `startupProbe` en el manifiesto pregunta periódicamente si el servicio está listo. Sin este check, Kubernetes no puede confirmar que la JVM arrancó.
 
 **Crear el archivo:**
 
