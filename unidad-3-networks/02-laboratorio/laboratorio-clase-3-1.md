@@ -236,15 +236,19 @@ docker inspect <tu_usuario>/inventory-service:1.2.0
 En el IDE, abre `inventory-service/k8s/deployment-service.yaml`. Realiza dos cambios:
 
 1. Busca la línea que dice:
+
 ```yaml
 image: <tu-usuario-dockerhub>/inventory-service:1.0.0
 ```
+
 Reemplázala por:
+
 ```yaml
 image: <tu-usuario-dockerhub>/inventory-service:1.2.0
 ```
 
 2. Busca la sección `Service` (al final del archivo), específicamente esta parte:
+
 ```yaml
 ---
 apiVersion: v1
@@ -265,6 +269,7 @@ spec:
 ```
 
 Cambia `port: 80` a `port: 8080`:
+
 ```yaml
   ports:
   - port: 8080
