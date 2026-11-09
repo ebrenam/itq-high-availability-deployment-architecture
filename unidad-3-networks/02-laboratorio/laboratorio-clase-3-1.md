@@ -101,7 +101,7 @@ Select-String "<version>" inventory-service/pom.xml | Select-Object -First 1
 
 > **Importante - Continuidad con U2:** En las unidades previas **no se modificó la versión del `pom.xml`**. En la Unidad 2 (Lab 2.2, Paso 8) el inventory-service pasó a `1.1.0` solo en el código Java (`"v1.1.0"`) y en el tag de la imagen Docker; el `pom.xml` se quedó en `1.0.0-SNAPSHOT`. Por eso aquí **no verás `1.1.0` en el pom.xml**: es lo esperado, no un error. Esta es la primera vez que actualizamos la versión del `pom.xml` (Paso 2).
 >
-> **Nota sobre manifiestos heredados:** Los directorios `catalog-service/k8s/` e `inventory-service/k8s/` ya existen del Laboratorio 2.2 de Unidad 2. En Paso 5 actualizaremos el manifiesto de inventory-service a v1.2.0 **y normalizaremos su puerto a 8080**. En Paso 15 crearemos manifiestos nuevos para payment-service (también en puerto 8080). En Paso 16 (Desplegar), desplegaremos los 3 servicios con puertos consistentes: todos en 8080. La reutilización y mejora iterativa de componentes es la esencia del desarrollo: cada unidad construye y perfecciona lo anterior.
+> **Nota sobre manifiestos heredados:** Los directorios `catalog-service/k8s/` e `inventory-service/k8s/` ya existen del Laboratorio 2.2 de Unidad 2. En Paso 5 actualizaremos el manifiesto de inventory-service a v1.2.0 **y normalizaremos su puerto a 8080**. En Paso 16 crearemos manifiestos nuevos para payment-service (también en puerto 8080). En Paso 17 (Desplegar), desplegaremos los 3 servicios con puertos consistentes: todos en 8080. La reutilización y mejora iterativa de componentes es la esencia del desarrollo: cada unidad construye y perfecciona lo anterior.
 
 ---
 
@@ -280,7 +280,7 @@ Cambia `port: 80` a `port: 8080`:
 
 Guarda el archivo.
 
-**Qué observar:** El archivo ahora referencia la imagen v1.2.0 y expone puerto 8080. Cuando desplegemos en Paso 16, Kubernetes tirará esta versión (con el endpoint nuevo `/reserve`) en el puerto correcto.
+**Qué observar:** El archivo ahora referencia la imagen v1.2.0 y expone puerto 8080. Cuando desplegemos en Paso 17, Kubernetes tirará esta versión (con el endpoint nuevo `/reserve`) en el puerto correcto.
 
 **Nota pedagógica:** Este paso hace dos cosas importantes:
 1. **Versionado de imágenes**: Cada cambio de código → nueva versión → manifiesto actualizado. Este es el ciclo vida de un servicio en producción.
@@ -396,7 +396,7 @@ public interface CatalogClient {
 
 Guarda el archivo.
 
-**Qué observar:** Esta es una interfaz JAX-RS que actúa como cliente HTTP dentro de payment-service. La anotación `@RegisterRestClient(configKey = "catalog-api")` vincula esta interfaz con la configuración en `application.properties` (que haremos en Paso 11). MicroProfile inyecta automáticamente la implementación en runtime.
+**Qué observar:** Esta es una interfaz JAX-RS que actúa como cliente HTTP dentro de payment-service. La anotación `@RegisterRestClient(configKey = "catalog-api")` vincula esta interfaz con la configuración en `application.properties` (que haremos en Paso 13). MicroProfile inyecta automáticamente la implementación en runtime.
 
 **Nota pedagógica:** Esta clase se ejecuta **dentro de payment-service**, pero se conecta a `catalog-service:8080` (nombre DNS interno de Kubernetes del servicio catalog). Este es el patrón de **comunicación inter-pod**: un Pod de payment-service busca otro Pod de catalog-service usando el nombre del Service interno.
 
@@ -446,7 +446,7 @@ public interface InventoryClient {
 
 Guarda el archivo.
 
-**Qué observar:** Esta es una interfaz JAX-RS que actúa como cliente HTTP dentro de payment-service. La anotación `@RegisterRestClient(configKey = "inventory-api")` vincula esta interfaz con la configuración en `application.properties` (que haremos en Paso 11). MicroProfile inyecta automáticamente la implementación en runtime.
+**Qué observar:** Esta es una interfaz JAX-RS que actúa como cliente HTTP dentro de payment-service. La anotación `@RegisterRestClient(configKey = "inventory-api")` vincula esta interfaz con la configuración en `application.properties` (que haremos en Paso 13). MicroProfile inyecta automáticamente la implementación en runtime.
 
 **Nota pedagógica:** Esta clase se ejecuta **dentro de payment-service**, pero se conecta a `inventory-service:8080` (nombre DNS interno de Kubernetes del servicio inventory). Ambos clientes (CatalogClient e InventoryClient) siguen el patrón de **comunicación inter-pod**: un Pod de payment-service busca otros Pods de catalog e inventory usando los nombres de los Services internos en puerto 8080.
 
@@ -541,7 +541,71 @@ Guarda el archivo.
 
 ---
 
-### Paso 11: Reemplazar PaymentResource (REST endpoint)
+### Paso 11: Crear StartupHealthCheck para payment-service
+
+**Qué hace:** Define un health check que valida si la aplicación arrancó correctamente, usado por Kubernetes en el startup probe.
+
+**Por qué:** El `startupProbe` en el manifiesto (Paso 16) pregunta periódicamente si el servicio está listo. Sin este check, Kubernetes no puede confirmar que la JVM arrancó.
+
+**Crear el archivo:**
+
+En el IDE, en el directorio `src/main/java/com/ecom/payment/`, crea un nuevo archivo llamado `StartupHealthCheck.java`:
+
+```java
+package com.ecom.payment;
+
+import org.eclipse.microprofile.health.HealthCheck;
+import org.eclipse.microprofile.health.HealthCheckResponse;
+import org.eclipse.microprofile.health.Startup;
+import jakarta.enterprise.context.ApplicationScoped;
+
+/**
+ * Startup Health Check para el servicio de pagos.
+ * 
+ * Este health check determina si la aplicación arrancó correctamente.
+ * Kubernetes usa este endpoint (/health/startup) para decidir cuándo
+ * el Pod está listo para recibir tráfico (readiness probe).
+ * 
+ * A diferencia de readinessProbe y livenessProbe, startupProbe se ejecuta
+ * SOLO al inicio hasta que devuelve UP. Luego Kubernetes lo ignora.
+ * 
+ * En producción, este check validaría:
+ * - Conectividad a bases de datos críticas
+ * - Carga de configuraciones externas
+ * - Validación de dependencias inyectadas
+ * 
+ * Para esta unidad, simplemente devolvemos UP (la aplicación arrancó).
+ */
+@Startup
+@ApplicationScoped
+public class StartupHealthCheck implements HealthCheck {
+
+    /**
+     * Verifica que el servicio de pagos arrancó correctamente.
+     * 
+     * @return HealthCheckResponse con estado UP
+     */
+    @Override
+    public HealthCheckResponse call() {
+        // En producción, aquí validaríamos conectividad real a servicios críticos
+        // Por ahora, si este método se invoca, significa que Quarkus arrancó exitosamente
+        return HealthCheckResponse.up("payment-startup-check");
+    }
+}
+```
+
+Guarda el archivo.
+
+**Qué observar:** La anotación `@Startup` vincula este check con el endpoint `/health/startup`. La lógica es simple: si podemos devolver una respuesta, Quarkus arrancó correctamente. En aplicaciones más complejas, este método haría validaciones exhaustivas antes de permitir tráfico.
+
+**Nota pedagógica:** El patrón de tres health checks (startup, readiness, liveness) es el estándar en Kubernetes:
+- **Startup**: ¿Terminó la inicialización? (solo se ejecuta al inicio)
+- **Readiness**: ¿Está listo para recibir tráfico? (continuo, después de startup OK)
+- **Liveness**: ¿Sigue vivo o se quedó colgado? (continuo, detecta deadlocks)
+
+---
+
+### Paso 12: Reemplazar PaymentResource (REST endpoint)
 
 **Qué hace:** Redefine el endpoint HTTP `/v1/payments` que expone el servicio de pagos.
 
@@ -586,7 +650,7 @@ Esta separación hace el código testeable, mantenible y resiliente. El Resource
 
 ---
 
-### Paso 12: Configurar application.properties
+### Paso 13: Configurar application.properties
 
 **Qué hace:** Define propiedades de configuración de Quarkus para payment-service, incluyendo URLs de los servicios remotos.
 
@@ -623,7 +687,7 @@ Kubernetes CoreDNS resuelve automáticamente estos nombres a las IPs de los Serv
 
 ---
 
-### Paso 13: Crear Dockerfile para payment-service
+### Paso 14: Crear Dockerfile para payment-service
 
 **Qué hace:** Define cómo empaquetar payment-service en una imagen Docker lista para Kubernetes.
 
@@ -664,9 +728,9 @@ Guarda el archivo.
 
 ---
 
-### Paso 14: Compilar y publicar payment-service v1.0.0 a Docker Hub
+### Paso 15: Compilar y publicar payment-service v1.0.0 a Docker Hub
 
-**Qué hace:** Compila el JAR, crea imagen Docker con el Dockerfile del Paso 13, publica como v1.0.0.
+**Qué hace:** Compila el JAR, crea imagen Docker con el Dockerfile del Paso 14, publica como v1.0.0.
 
 **Por qué:** Es la versión lista para desplegar en Kubernetes.
 
@@ -679,7 +743,7 @@ mvn clean package -DskipTests
 # Verifica JAR
 ls -la target/quarkus-app/
 
-# Construir imagen (usa el Dockerfile creado en Paso 13)
+# Construir imagen (usa el Dockerfile creado en Paso 14)
 docker build -t <tu_usuario>/payment-service:1.0.0 .
 
 # Publicar
@@ -710,7 +774,7 @@ curl -s "https://hub.docker.com/v2/repositories/<tu_usuario>/payment-service/tag
 
 ---
 
-### Paso 15: Crear manifestos Kubernetes para payment-service
+### Paso 16: Crear manifestos Kubernetes para payment-service
 
 **Qué hace:** Definir cómo Kubernetes ejecutará payment-service con configuración de resiliencia y networking.
 
@@ -721,7 +785,7 @@ curl -s "https://hub.docker.com/v2/repositories/<tu_usuario>/payment-service/tag
 - Si un Pod sigue vivo o se quedó colgado (liveness probe)
 - Cómo exponer el servicio internamente (ClusterIP para comunicación inter-pod)
 
-**Nota de transición:** Hasta ahora hemos desarrollado código Java en el IDE (Pasos 2-12), creado el Dockerfile (Paso 13), y compilado + publicado la imagen Docker (Paso 14). Ahora creamos los archivos de configuración Kubernetes que describen cómo ejecutar la aplicación en el clúster. Estos también se crean en el IDE como archivos de proyecto.
+**Nota de transición:** Hasta ahora hemos desarrollado código Java en el IDE (Pasos 2-12), creado el Dockerfile (Paso 14), y compilado + publicado la imagen Docker (Paso 15). Ahora creamos los archivos de configuración Kubernetes que describen cómo ejecutar la aplicación en el clúster. Estos también se crean en el IDE como archivos de proyecto.
 
 **Crear el archivo:**
 
@@ -850,7 +914,7 @@ Este es el mismo patrón que usaste en Unidad 2 Lab 2.2 para `inventory-service`
 
 | Elemento | Propósito | Observación |
 |----------|-----------|-------------|
-| `type: ClusterIP` | Acceso interno únicamente (default) | No es accesible desde fuera del clúster (Gateway lo expondrá en Paso 18) |
+| `type: ClusterIP` | Acceso interno únicamente (default) | No es accesible desde fuera del clúster (Gateway lo expondrá en Paso 19) |
 | `port: 8080` | Puerto de escucha del Service | Los Pods internos usan este puerto para comunicarse |
 | `targetPort: 8080` | Puerto del contenedor | Service redirecciona puerto 8080 → containerPort 8080 |
 
@@ -869,7 +933,7 @@ La configuración `maxSurge: 1` + `maxUnavailable: 0` implementa lo que Clase 3.
 
 ---
 
-### Paso 16: Desplegar los 3 servicios en Kubernetes
+### Paso 17: Desplegar los 3 servicios en Kubernetes
 
 **Qué hace:** Aplica manifiestos de catalog, inventory, y payment al clúster.
 
@@ -963,7 +1027,7 @@ kubectl get svc
 
 ---
 
-### Paso 17: Probar comunicación inter-servicios (sin Gateway aún)
+### Paso 18: Probar comunicación inter-servicios (sin Gateway aún)
 
 **Qué hace:** Verifica que payment-service puede alcanzar catalog e inventory internamente.
 
@@ -1007,7 +1071,7 @@ kubectl exec -it $POD_NAME -- curl -X POST http://payment-service:80/v1/payments
 
 ---
 
-### Paso 18: Instalar Envoy Gateway y crear Gateway API
+### Paso 19: Instalar Envoy Gateway y crear Gateway API
 
 **Qué hace:** Instala Envoy Gateway Controller y recursos de Gateway API.
 
@@ -1061,7 +1125,7 @@ kubectl get pods -n envoy-gateway-system
 
 ---
 
-### Paso 19: Crear certificado TLS y configurar Gateway + HTTPRoute
+### Paso 20: Crear certificado TLS y configurar Gateway + HTTPRoute
 
 **Qué hace:** Genera certificado autofirmado, lo monta en Secret K8s, y configura enrutamiento externo.
 
@@ -1200,7 +1264,7 @@ kubectl describe gateway payment-gateway
 
 ---
 
-### Paso 20: Probar acceso externo con TLS
+### Paso 21: Probar acceso externo con TLS
 
 **Qué hace:** Accede a payment-service desde fuera del clúster via HTTPS usando Gateway.
 
