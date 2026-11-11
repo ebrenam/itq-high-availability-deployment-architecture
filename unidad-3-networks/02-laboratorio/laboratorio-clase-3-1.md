@@ -884,6 +884,7 @@ Guarda el archivo.
 **Qué observar:**
 
 **Archivo creado:**
+
 ```
 payment-service/k8s/
 └── deployment-service.yaml    # Deployment + Service juntos
@@ -1019,7 +1020,11 @@ kubectl get svc
 ```
 
 **Qué observar:** 
-- Todos los Pods están en `Running` (2 replicas cada uno = 6 Pods totales)
+- Todos los Pods están en `Running`:
+  - catalog-service: 1 Pod (por diseño de Lab 1.3)
+  - inventory-service: 2 replicas
+  - payment-service: 2 replicas
+  - **Total: 5 Pods**
 - Los Services tienen ClusterIP asignadas
 - `kubectl logs pod/<pod_name>` muestra logs de Quarkus sin errores
 
