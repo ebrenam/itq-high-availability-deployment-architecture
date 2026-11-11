@@ -829,10 +829,10 @@ spec:
               memory: 512Mi
         
           # 1. StartupProbe: ¿Arrancó la JVM correctamente?
-          # Endpoint: curl http://localhost:8080/health/startup
+          # Endpoint: curl http://localhost:8080/health
           startupProbe:
             httpGet:
-              path: /health/startup
+              path: /health
               port: 8080
             initialDelaySeconds: 0
             periodSeconds: 2
