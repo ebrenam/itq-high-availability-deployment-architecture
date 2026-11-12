@@ -15,11 +15,13 @@ kubectl version --client
 Deberías ver algo como:
 
 ```bash
-Client Version: v1.28.0
-Kustomize Version: v5.0.0
+Client Version: v1.32.0
+Kustomize Version: v5.7.1
 ```
 
 Si obtienes un error, procede con la instalación según tu SO.
+
+> **Nota:** Este curso usa Kubernetes 1.32.0 o superior. Versiones anteriores (1.28, 1.31) funcionan para las unidades 1 y 2, pero la Unidad 3 requiere K8s 1.32.0 para Envoy Gateway y Gateway API.
 
 ---
 
@@ -155,7 +157,7 @@ kubectl version --client
 
 1. **Descargar ejecutable:**
    - Ve a: https://dl.k8s.io/release/stable.txt para obtener la versión más reciente
-   - Descarga desde: `https://dl.k8s.io/release/v1.28.0/bin/windows/amd64/kubectl.exe` (reemplaza `v1.28.0` con la versión actual)
+   - Descarga desde: `https://dl.k8s.io/release/v1.32.0/bin/windows/amd64/kubectl.exe` (reemplaza `v1.32.0` con la versión actual)
 
 2. **Guardar en un directorio en PATH:**
    - Crea carpeta: `C:\Program Files\kubectl\`
@@ -288,7 +290,7 @@ Deberías ver al menos un nodo:
 
 ```
 NAME       STATUS   ROLES           AGE   VERSION
-minikube   Ready    control-plane   5m    v1.28.0
+minikube   Ready    control-plane   5m    v1.32.0
 ```
 
 ### Prueba 3: Listar pods del sistema
@@ -417,20 +419,20 @@ newgrp docker
 **Síntoma:** Versiones de `kubectl` y Kubernetes no coinciden.
 
 ```
-Client Version: v1.28.0
-Server Version: v1.26.0
+Client Version: v1.35.10
+Server Version: v1.32.0
 ```
 
 **Solución:** Descarga una versión de `kubectl` compatible:
 
 ```bash
-# Descargar versión específica (ejemplo v1.26.0)
-curl -LO "https://dl.k8s.io/release/v1.26.0/bin/linux/amd64/kubectl"
+# Descargar versión específica (ejemplo v1.32.0)
+curl -LO "https://dl.k8s.io/release/v1.32.0/bin/linux/amd64/kubectl"
 chmod +x kubectl
 sudo mv kubectl /usr/local/bin/kubectl
 ```
 
-Nota: Pequeñas diferencias (1.28 vs 1.26) generalmente son toleradas. Diferencias mayores pueden causar incompatibilidades.
+Nota: Pequeñas diferencias (1.32 vs 1.35) generalmente son toleradas. El curso funciona con v1.32.0 o superior en el servidor, aunque el cliente sea más reciente.
 
 ---
 

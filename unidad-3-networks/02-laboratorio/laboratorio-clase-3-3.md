@@ -24,9 +24,9 @@ Ahora necesitas:
 
 - Laboratorio 3.2 **completamente terminado** (NetworkPolicy aplicadas y validadas)
 - payment-service en v1.0.0 ejecutándose con 2 replicas en namespace `production`
-- Gateway API y Envoy Gateway funcionales y accesibles
+- Gateway API y Kong Gateway funcionales y accesibles
 - Permisos administrativos en el clúster (crear Roles, RoleBindings, etiquetas de namespace)
-- `kubectl` compatible con Kubernetes 1.28+
+- `kubectl` compatible con Kubernetes 1.32.0+
 - Imagen de payment-service publicada en Docker Hub (v1.0.0)
 
 **Nota pedagógica:** Este laboratorio modifica el Deployment existente mediante patches, no lo elimina. Así se mantiene la continuidad de servicio.

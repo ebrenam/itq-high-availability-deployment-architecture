@@ -5,13 +5,13 @@
 **El escenario:** Completaste Lab 3.1 con los 3 servicios **ya desplegados en namespace `default`**:
 - `catalog-service:1.0.0` (2 replicas)
 - `inventory-service:1.2.0` (2 replicas)
-- `payment-service:1.0.0` (2 replicas) + Envoy Gateway (HTTPS validado)
+- `payment-service:1.0.0` (2 replicas) + Kong Gateway (HTTPS validado)
 
 Sin embargo, en la red actual **todos los Pods se comunican libremente** entre sí. Cualquier Pod podría acceder a cualquier otro sin restricción (principio de *Default Allow*).
 
 Ahora necesitas:
 1. Aplicar una política de **denegación predeterminada** a payment-service (`Default Deny`)
-2. Permitir tráfico **solo desde Envoy Gateway** (Ingress) e **inter-servicios** (Egress: payment → catalog, payment → inventory)
+2. Permitir tráfico **solo desde Kong Gateway** (Ingress) e **inter-servicios** (Egress: payment → catalog, payment → inventory)
 3. Validar que las políticas realmente bloquean tráfico no autorizado
 
 **El objetivo:** Implementar aislamiento L3/L4 con `NetworkPolicy`, demostrando el principio de **mínimo privilegio en red**.
@@ -25,7 +25,7 @@ Ahora necesitas:
 **🔗 Continuidad:** Este laboratorio es la **continuación directa de Lab 3.1**. Asume que:
 - ✅ Lab 3.1 está **completamente terminado**
 - ✅ Los 3 servicios están corriendo en namespace `default`
-- ✅ Envoy Gateway está instalado y funcional
+- ✅ Kong Gateway está instalado y funcional
 - ✅ HTTPS está validado (certificado autofirmado)
 - ✅ Todos los Pods están en estado `Running`
 
@@ -40,8 +40,8 @@ kubectl get pods -l app=payment-service -o wide
 # Confirmar que los Services existen
 kubectl get services
 
-# Confirmar que Envoy Gateway está activo
-kubectl get pods -n envoy-gateway-system
+# Confirmar que Kong Gateway está activo
+kubectl get pods -n kong-system
 kubectl get gateways
 ```
 
@@ -135,7 +135,7 @@ kubectl get pods -n production --show-labels
 # Ver etiquetas específicas de payment-service
 kubectl get pods -n production -l app=payment-service --show-labels
 
-# Ver etiquetas de Envoy Gateway proxy (datos)
+# Ver etiquetas de Kong Gateway proxy (datos)
 kubectl get pods -n envoy-gateway-system --show-labels | head -20
 
 # Identifica cuál es el Pod que maneja tráfico (busca "envoy" en el nombre)
@@ -167,7 +167,7 @@ kubectl get pod $PROXY_POD -n envoy-gateway-system -o yaml | Select-String -Cont
 - Pods de payment-service deben tener `app: payment-service`
 - Pods de catalog-service deben tener `app: catalog-service`
 - Pods de inventory-service deben tener `app: inventory-service`
-- El proxy de Envoy debe tener etiquetas identificables (probablemente `app: envoy` o similar)
+- El proxy de Kong debe tener etiquetas identificables (probablemente `app.kubernetes.io/instance: kong` o similar)
 
 **Nota pedagógica:** Estos labels vinieron de tus manifiestos K8s de Lab 3.1. Son arbitrarios pero consistentes.
 
@@ -214,7 +214,7 @@ kubectl describe networkpolicy payment-deny-all -n production
 - Sin `ingress` o `egress` rules definidas = denegar TODO
 
 **Nota pedagógica:** En este punto, payment-service **NO PUEDE** hablar con nada:
-- No recibe conexiones de Envoy (Ingress bloqueado)
+- No recibe conexiones de Kong (Ingress bloqueado)
 - No puede llamar a catalog/inventory (Egress bloqueado)
 - No puede resolver DNS (Egress a puerto 53 bloqueado)
 
@@ -264,9 +264,9 @@ En ese caso, verifica con tu proveedor de CNI que esté correctamente habilitado
 
 ---
 
-### Paso 5: Permitir Ingress desde Envoy Gateway
+### Paso 5: Permitir Ingress desde Kong Gateway
 
-**Qué hace:** Abre un "agujero" en la política para que Envoy pueda alcanzar payment-service.
+**Qué hace:** Abre un "agujero" en la política para que Kong pueda alcanzar payment-service.
 
 **Por qué:** payment-service debe ser accesible desde el proxy de Gateway API.
 
@@ -282,7 +282,7 @@ $ENVOY_POD = kubectl get pods -n envoy-gateway-system -o jsonpath='{.items[0].me
 kubectl get pod $ENVOY_POD -n envoy-gateway-system -o yaml | Select-String -Context 0,5 "labels:"
 ```
 
-Anota las etiquetas clave (típicamente `app: envoy` o `gateway.envoyproxy.io/owned-by: <gateway-name>`).
+Anota las etiquetas clave (típicamente `app.kubernetes.io/instance: kong` o `gateway.envoyproxy.io/owned-by: <gateway-name>`).
 
 **Crear archivo `allow-payment-ingress.yaml`:**
 
@@ -307,7 +307,7 @@ spec:
           kubernetes.io/metadata.name: envoy-gateway-system
       podSelector:
         matchLabels:
-          app: envoy  # AJUSTA ESTA ETIQUETA si tu Pod tiene otra
+          app.kubernetes.io/instance: kong  # AJUSTA ESTA ETIQUETA si tu Pod tiene otra
     ports:
     - protocol: TCP
       port: 8080
@@ -326,7 +326,7 @@ kubectl describe networkpolicy allow-payment-ingress -n production
 - El `from` combina `namespaceSelector` AND `podSelector` (ambas condiciones deben cumplirse)
 - Puerto 8080 es el que escucha payment-service
 
-**Nota pedagógica:** Si el Pod proxy NO tiene etiqueta `app: envoy`, la política no coincidirá y Envoy seguirá sin poder acceder. Verifica las etiquetas exactas.
+**Nota pedagógica:** Si el Pod proxy NO tiene etiqueta `app.kubernetes.io/instance: kong`, la política no coincidirá y Kong seguirá sin poder acceder. Verifica las etiquetas exactas.
 
 ---
 
@@ -560,7 +560,7 @@ kubectl get pods -n kube-system | grep calico
 kubectl get pods -n envoy-gateway-system -o yaml | grep -A 20 "labels:"
 
 # Copia la EXACT etiqueta clave-valor
-# Ejemplo si ves: "app: envoy" o "gateway.envoyproxy.io/owned-by: payment-gateway"
+# Ejemplo si ves: "app.kubernetes.io/instance: kong" o "gateway.envoyproxy.io/owned-by: payment-gateway"
 
 # Actualiza el archivo allow-payment-ingress.yaml con la etiqueta correcta
 kubectl apply -f allow-payment-ingress.yaml
@@ -603,7 +603,7 @@ kubectl run dns-test \
 **Checklist de evidencia:**
 
 - [ ] NetworkPolicy `payment-deny-all` existe y bloquea todo
-- [ ] NetworkPolicy `allow-payment-ingress` permite acceso desde Envoy
+- [ ] NetworkPolicy `allow-payment-ingress` permite acceso desde Kong
 - [ ] NetworkPolicy `allow-payment-dns` permite resolución DNS
 - [ ] NetworkPolicy `allow-payment-egress-to-services` permite llamadas inter-servicios
 - [ ] `curl` a payment-service vía HTTPS devuelve JSON válido
@@ -628,8 +628,8 @@ curl --cacert payment.crt https://payment.local:8443/v1/payments
 1. **¿Qué pasaría si solo aplicaras Default Deny de Ingress, pero no de Egress?**
    - Respuesta: payment-service no recibe conexiones, pero PUEDE iniciar conexiones salientes. Esto limita entrada pero no salida.
 
-2. **¿Por qué el selector de Envoy necesita AMBOS namespaceSelector Y podSelector?**
-   - Respuesta: Porque ambos se combinan con AND. El Pod debe estar EN envoy-gateway-system Y tener la etiqueta correcta.
+2. **¿Por qué el selector de Kong necesita AMBOS namespaceSelector Y podSelector?**
+   - Respuesta: Porque ambos se combinan con AND. El Pod debe estar EN kong-system Y tener la etiqueta correcta.
 
 3. **¿Qué pasa si un Pod en production tiene la etiqueta `app: payment-service` pero NO es payment-service?**
    - Respuesta: La política lo afectaría igual. Las etiquetas son solo identificadores; la política no valida si "realmente" es payment-service.
@@ -660,7 +660,7 @@ NetworkPolicy + RBAC + SecurityContext = Defensa en profundidad real.
 
 ---
 
-**Laboratorio completado cuando:** Las 4 políticas están aplicadas, payment-service es accesible desde Envoy e inter-servicios, pero bloqueado desde namespaces externos.
+**Laboratorio completado cuando:** Las 4 políticas están aplicadas, payment-service es accesible desde Kong e inter-servicios, pero bloqueado desde namespaces externos.
 - Validar que solo los Pods autorizados pueden ejecutar acciones
 
 **Relación con unidades anteriores:**
@@ -683,4 +683,4 @@ NetworkPolicy + RBAC + SecurityContext = Defensa en profundidad real.
 ## Fuentes primarias
 
 - Kubernetes Authors. _Network Policies_. <https://kubernetes.io/docs/concepts/services-networking/network-policies/>
-- Envoy Gateway. _Quickstart_. <https://gateway.envoyproxy.io/docs/tasks/quickstart/>
+- Kong Gateway. _Documentation_. <https://docs.konghq.com/gateway/>

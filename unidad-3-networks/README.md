@@ -20,7 +20,7 @@ unidad-3-networks/
 │   ├── clase-3-3.md                 # Seguridad: RBAC, SecurityContext, Pod Security Admission
 │
 ├── 02-laboratorio/                  # PRÁCTICA — Implementación hands-on
-│   ├── laboratorio-clase-3-1.md     # Lab 3.1: Gateway API, Envoy Gateway y TLS
+│   ├── laboratorio-clase-3-1.md     # Lab 3.1: Gateway API, Kong Gateway y TLS
 │   ├── laboratorio-clase-3-2.md     # Lab 3.2: NetworkPolicies
 │   ├── laboratorio-clase-3-3.md     # Lab 3.3: RBAC, PSA y SecurityContext
 │   ├── images/                      # Screenshots y diagramas de laboratorios
@@ -107,7 +107,7 @@ La unidad parte de `02-laboratorio/proyecto-base-unidad-03/`, que contiene `cata
 ### Información rápida
 
 - **Duración estimada:** 6-8 horas (3 clases y 3 laboratorios; ajustable según experiencia y entorno)
-- **Tecnología:** Kubernetes (Minikube/Kind), kubectl, Gateway API, Envoy Gateway, Helm, OpenSSL y curl
+- **Tecnología:** Kubernetes (Minikube/Kind), kubectl, Gateway API, Kong Gateway, Helm, OpenSSL y curl
 - **Nivel de dificultad:** Avanzado (requiere completar U2)
 - **Resultado esperado:** Endpoint de demostración expuesto por HTTPS con Gateway API y un Pod endurecido; NetworkPolicy se valida si el CNI la implementa
 
@@ -135,9 +135,9 @@ La unidad parte de `02-laboratorio/proyecto-base-unidad-03/`, que contiene `cata
 
 - Kubernetes SIG Network. _Gateway API: Getting Started_. <https://gateway-api.sigs.k8s.io/guides/getting-started/introduction/>
 
-- Envoy Gateway. _Quickstart_. <https://gateway.envoyproxy.io/docs/tasks/quickstart/>
+- Kong Gateway. _Documentation_. <https://docs.konghq.com/gateway/>
 
-- Envoy Gateway. _Compatibility Matrix_. <https://gateway.envoyproxy.io/news/releases/matrix/>
+- Kong Ingress Controller. _Getting Started_. <https://docs.konghq.com/kubernetes-ingress-controller/latest/guides/getting-started/
 
 - Kubernetes Authors. _Using RBAC Authorization_. <https://kubernetes.io/docs/reference/access-authn-authz/rbac/>
 

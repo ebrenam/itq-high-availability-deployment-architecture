@@ -36,7 +36,7 @@ Gateway API separa responsabilidades mediante recursos como `GatewayClass`, `Gat
 
 Las funciones adicionales, como reescritura de URLs, límites de solicitudes o autenticación, no son uniformes: dependen de las capacidades del controlador o de extensiones de la plataforma.
 
-> **Nota de mantenimiento:** Ingress NGINX fue retirado en marzo de 2026 y ya no recibe correcciones ni actualizaciones de seguridad. La práctica de esta unidad usa Envoy Gateway con Gateway API; Ingress se conserva como concepto y API existente, no como recomendación de controlador nuevo.
+> **Nota de mantenimiento:** Ingress NGINX fue retirado en marzo de 2026 y ya no recibe correcciones ni actualizaciones de seguridad. La práctica de esta unidad usa Kong Gateway con Gateway API; Ingress se conserva como concepto y API existente, no como recomendación de controlador nuevo.
 
 ---
 
@@ -60,7 +60,7 @@ Imagina un gran edificio corporativo de oficinas:
 
 ![Esquema conceptual de cliente, controlador de entrada, Service y Pods](images/image-02.jpg)
 
-Este diagrama usa NGINX como ejemplo de controlador existente; el Laboratorio 3.1 implementa el patrón con Envoy Gateway y Gateway API.
+Este diagrama usa NGINX como ejemplo de controlador existente; el Laboratorio 3.1 implementa el patrón con Kong Gateway y Gateway API.
 
 ---
 
@@ -106,7 +106,7 @@ Kubernetes ha evolucionado en cómo expone servicios. Ambos modelos coexisten, p
 **Características:**
 - ✅ API v1 estable desde agosto 2024 (aprobada por CNCF)
 - ✅ Activamente desarrollada (nuevas funcionalidades cada release)
-- ✅ Soporte creciente: Envoy Gateway, Kong, Nginx Gateway Agent, GKE, AWS ALB Controller
+- ✅ Soporte creciente: Kong, Nginx Gateway Agent, GKE, AWS ALB Controller, y otros
 - ✅ Separa responsabilidades: `GatewayClass` (infraestructura), `Gateway` (listener config), `HTTPRoute` (reglas)
 - ✅ Más flexible: permite extensiones, múltiples controladores, composición modular
 
@@ -117,7 +117,7 @@ Kubernetes ha evolucionado en cómo expone servicios. Ambos modelos coexisten, p
 | Aspecto | Ingress | Gateway API |
 |--------|---------|-------------|
 | **Estado API** | Congelada (v1, sin cambios) | Activa (v1, evoluciona) |
-| **Controladores** | NGINX (retirado 2026), Traefik, Kong | Envoy (v1.9.3), Kong, Nginx Agent |
+| **Controladores** | NGINX (retirado 2026), Traefik, Kong | Kong, Nginx Agent, AWS ALB Controller |
 | **Separación de responsabilidades** | No; todo en `Ingress` | Sí; `GatewayClass`, `Gateway`, `HTTPRoute` |
 | **Extensiones** | Limitadas (annotations) | Extensiones nativas |
 | **Portabilidad** | Media (annotations no portables) | Alta (recursos estándar) |
@@ -126,19 +126,24 @@ Kubernetes ha evolucionado en cómo expone servicios. Ambos modelos coexisten, p
 
 ### En esta práctica
 
-Usamos **Gateway API con Envoy Gateway** porque:
+Usamos **Gateway API con Kong Gateway v3.9.1** porque:
 - ✅ Es el camino recomendado por Kubernetes SIG Network
-- ✅ Envoy Gateway es estable, eficiente y seguro
+- ✅ Kong es estable, maduro y usado en producción
+- ✅ Funciona perfectamente con K8s 1.32.0+
 - ✅ Preparas a estudiantes para arquitecturas modernas
-- ✅ Evitas dependencias retiradas (NGINX)
+- ✅ Evitas dependencias retiradas (NGINX Ingress)
 
 Ingress sigue siendo un concepto válido que encontrarás en sistemas heredados, pero no es el punto de partida para nuevos diseños.
+
+**✅ Requisitos técnicos para el Laboratorio:**
+- Kubernetes **1.32.0 o superior** (Kong v3.9.1 es totalmente compatible)
+- Kong se instala fácilmente via Helm sin problemas de compatibilidad
 
 ---
 
 ## 6. Laboratorio
 
-Para completar esta parte, sigue el [Laboratorio de la clase 3.1](../02-laboratorio/laboratorio-clase-3-1.md). Allí crearás un endpoint HTTP estático de demostración, instalarás Envoy Gateway, configurarás recursos Gateway API y TLS, y validarás el acceso local. El TLS del laboratorio termina en el Gateway; el tramo Gateway–Pod usa HTTP y no demuestra cifrado de extremo a extremo.
+Para completar esta parte, sigue el [Laboratorio de la clase 3.1](../02-laboratorio/laboratorio-clase-3-1.md). Allí crearás un endpoint HTTP estático de demostración, instalarás Kong Gateway, configurarás recursos Gateway API y TLS, y validarás el acceso local. El TLS del laboratorio termina en el Gateway; el tramo Gateway–Pod usa HTTP y no demuestra cifrado de extremo a extremo.
 
 ---
 

@@ -154,7 +154,7 @@ El efecto visible de un flujo denegado (por ejemplo, timeout o error de conexió
 
 ## 6. Laboratorio
 
-Para completar esta parte, sigue el [Laboratorio de la clase 3.2](../02-laboratorio/laboratorio-clase-3-2.md). Allí verificarás el soporte de NetworkPolicy del CNI, aislarás el servicio de demostración, permitirás el tráfico desde el proxy de datos de Envoy Gateway y validarás reglas inter-servicios/DNS de forma opcional.
+Para completar esta parte, sigue el [Laboratorio de la clase 3.2](../02-laboratorio/laboratorio-clase-3-2.md). Allí verificarás el soporte de NetworkPolicy del CNI, aislarás el servicio de demostración, permitirás el tráfico desde el proxy de datos de Kong Gateway y validarás reglas inter-servicios/DNS de forma opcional.
 
 ---
 

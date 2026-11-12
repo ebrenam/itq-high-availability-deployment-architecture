@@ -16,7 +16,8 @@
 
 ## Requisitos previos
 
-- Minikube v1.32+ o Kind con Kubernetes 1.28+ instalado y ejecutándose
+- **Kubernetes 1.32.0 o superior** (Kong Gateway v3.9.1 es totalmente compatible; ver [Actualizar Minikube](../01-clase/anexo-actualizar-minikube-k8s.md))
+- Minikube v1.32+ o Kind con Kubernetes 1.32.0+ instalado y ejecutándose
 - Maven 3.9+ y JDK 21+
 - Docker Desktop o Podman (para compilar y publicar imágenes)
 - Docker Hub account con credenciales configuradas (`docker login`)
@@ -45,14 +46,14 @@ En Clase 3.1 aprendiste cómo Kubernetes expone servicios mediante **Services** 
 |---|---|
 | **ClusterIP (Service)** | `catalog-service` e `inventory-service` usan ClusterIP (acceso interno). `payment-service` también usa ClusterIP internamente. |
 | **Comunicación inter-pod** | `payment-service` realiza llamadas HTTP reales a `catalog-service` e `inventory-service` usando nombres DNS internos, todos en puerto 8080 (`catalog-service:8080`, `inventory-service:8080`). |
-| **Gateway API** | Exponemos `payment-service` públicamente mediante **Envoy Gateway** con recurso `Gateway` y `HTTPRoute`, con terminación TLS. |
+| **Gateway API** | Exponemos `payment-service` públicamente mediante **Kong Gateway** con recurso `Gateway` y `HTTPRoute`, con terminación TLS. |
 | **Caso de uso E-commerce** | Implementas el escenario exacto descrito en clase: 3 microservicios donde payment orquesta, catalog y inventory son internos, y payment es accesible externamente. |
 
 **Arquitectura que construirás:**
 
 ```
 Internet (HTTPS) 
-    ↓ [Envoy Gateway + Gateway API]
+    ↓ [Kong Gateway + Gateway API]
     ↓ (TLS termination)
 payment-service (ClusterIP) 
     ↓ (HTTP interno)
@@ -1048,7 +1049,7 @@ POD_NAME=$(kubectl get pods -l app=payment-service -o jsonpath='{.items[0].metad
 kubectl logs $POD_NAME -f
 
 # Prueba 2: Hacer un curl interno desde otro Pod
-kubectl exec -it $POD_NAME -- curl -X POST http://payment-service:80/v1/payments \
+kubectl exec -it $POD_NAME -- curl -X POST http://payment-service:8080/v1/payments \
   -H "Content-Type: application/json" \
   -d '{"productId":"PROD-001","quantity":1,"amount":19.99}' 
 
@@ -1076,57 +1077,61 @@ kubectl exec -it $POD_NAME -- curl -X POST http://payment-service:80/v1/payments
 
 ---
 
-### Paso 19: Instalar Envoy Gateway y crear Gateway API
+### Paso 19: Instalar Kong Gateway Controller
 
-**Qué hace:** Instala Envoy Gateway Controller y recursos de Gateway API.
+**Qué hace:** Instala Kong Gateway Controller v3.9.1 para enrutar tráfico HTTP/HTTPS.
 
-**Por qué:** Necesitamos exponerlo con TLS (HTTPS) para acceso externo.
+**Por qué:** Kong maneja la entrada externa con soporte nativo para Gateway API y TLS.
+
+**✅ Requisito:** Kong funciona perfectamente con Kubernetes 1.32.0+.
+
+**Verificar tu versión de K8s:**
+```bash
+kubectl version
+# Debe mostrar: Server Version: v1.32.0 (o superior)
+```
 
 ![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
-# Agrega repo de Helm para Envoy
-helm repo add envoy-ai https://envoyproxy.github.io/gateway-helm
+# Agrega repositorio de Kong
+helm repo add kong https://charts.konghq.com
 helm repo update
 
-# Instala Envoy Gateway v1.9.3 (compatible con K8s 1.28+)
-helm install eg envoy-ai/gateway \
-  --version v1.9.3 \
-  --namespace envoy-gateway-system \
-  --create-namespace
-
-# Espera a que el controlador esté listo
-kubectl wait --timeout=5m \
-  -n envoy-gateway-system \
-  deployment/envoy-gateway \
-  --for=condition=Available
+# Instala Kong Gateway v3.9.1
+helm install kong kong/kong \
+  --namespace kong-system \
+  --create-namespace \
+  --wait
 
 # Verifica instalación
-kubectl get crd gateways.gateway.networking.k8s.io
-kubectl get pods -n envoy-gateway-system
+kubectl get pods -n kong-system
+kubectl get svc -n kong-system
 ```
 
 ![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
-helm repo add envoy-ai https://envoyproxy.github.io/gateway-helm
+# Agrega repositorio de Kong
+helm repo add kong https://charts.konghq.com
 helm repo update
 
-helm install eg envoy-ai/gateway `
-  --version v1.9.3 `
-  --namespace envoy-gateway-system `
-  --create-namespace
+# Instala Kong Gateway v3.9.1
+helm install kong kong/kong `
+  --namespace kong-system `
+  --create-namespace `
+  --wait
 
-kubectl wait --timeout=5m `
-  -n envoy-gateway-system `
-  deployment/envoy-gateway `
-  --for=condition=Available
-
-kubectl get crd gateways.gateway.networking.k8s.io
+# Verifica instalación
+kubectl get pods -n kong-system
+kubectl get svc -n kong-system
 kubectl get pods -n envoy-gateway-system
 ```
 
-**Qué observar:** Se crean CRDs (`gateways.gateway.networking.k8s.io`, etc.) y Pod `envoy-gateway-xxxx` está en `Running`.
+**Qué observar:** 
+- ✅ Pods `kong-kong-*` en estado `Running`
+- ✅ Servicio `kong-kong-proxy` con tipo LoadBalancer/NodePort
+- ✅ Kong está listo para recibir tráfico
 
 ---
 
@@ -1278,15 +1283,14 @@ kubectl describe gateway payment-gateway
 ![linux](images/linux.png) **Linux/macOS:**
 
 ```bash
-# Obtener nombre del Service de Envoy proxy (creado automáticamente por Gateway)
-ENVOY_SERVICE=$(kubectl get svc -n envoy-gateway-system \
-  -l gateway.envoyproxy.io/owning-gateway-namespace=production,gateway.envoyproxy.io/owning-gateway-name=payment-gateway \
+# Obtener nombre del Service de Kong proxy (creado automáticamente por Gateway)
+KONG_SERVICE=$(kubectl get svc -n kong-system -l app.kubernetes.io/instance=kong \
   -o jsonpath='{.items[0].metadata.name}')
 
-echo "Envoy Service: $ENVOY_SERVICE"
+echo "Kong Service: $KONG_SERVICE"
 
 # En una terminal, reenviar puertos
-kubectl port-forward -n envoy-gateway-system "service/$ENVOY_SERVICE" 8443:443 8080:80 &
+kubectl port-forward -n kong-system "service/$KONG_SERVICE" 8443:443 8080:80 &
 
 # Esperar 2 segundos
 sleep 2
@@ -1310,14 +1314,13 @@ curl --resolve payment.local:8080:127.0.0.1 \
 ![win](images/windows.png) **Windows (PowerShell):**
 
 ```powershell
-$ENVOY_SERVICE = kubectl get svc -n envoy-gateway-system `
-  -l gateway.envoyproxy.io/owning-gateway-namespace=production,gateway.envoyproxy.io/owning-gateway-name=payment-gateway `
+$KONG_SERVICE = kubectl get svc -n kong-system -l app.kubernetes.io/instance=kong `
   -o jsonpath='{.items[0].metadata.name}'
 
-Write-Host "Envoy Service: $ENVOY_SERVICE"
+Write-Host "Kong Service: $KONG_SERVICE"
 
 # En PowerShell, start port-forward en background
-Start-Process -NoNewWindow kubectl -ArgumentList "port-forward", "-n", "envoy-gateway-system", "service/$ENVOY_SERVICE", "8443:443", "8080:80"
+Start-Process -NoNewWindow kubectl -ArgumentList "port-forward", "-n", "kong-system", "service/$KONG_SERVICE", "8443:443", "8080:80"
 
 # Esperar
 Start-Sleep -Seconds 2
@@ -1379,7 +1382,7 @@ curl --resolve payment.local:8080:127.0.0.1 `
    ```
    [Cliente HTTPS] 
         ↓ (port-forward:8443)
-   [Envoy Gateway - Payment.local]
+   [Kong Gateway - Payment.local]
         ↓ (HTTP interno)
    [Payment Service Pod(s)]
         ├→ (HTTP) [Catalog Service]
@@ -1392,12 +1395,12 @@ curl --resolve payment.local:8080:127.0.0.1 `
 
 En el próximo laboratorio, agregaremos `NetworkPolicy` para aislar la comunicación. Antes de ese paso, identifica:
 
-1. Namespace y etiquetas exactas de los **Pods de datos de Envoy** (no el control plane):
+1. Namespace y etiquetas exactas de los **Pods de datos de Kong** (no el control plane):
    ```bash
-   kubectl get pods -n envoy-gateway-system -o wide --show-labels
+   kubectl get pods -n kong-system -o wide --show-labels
    ```
 
-2. Estas etiquetas serán necesarias para permitir ingreso a payment-service desde Envoy.
+2. Estas etiquetas serán necesarias para permitir ingreso a payment-service desde Kong.
 
 ---
 
@@ -1413,8 +1416,8 @@ En el próximo laboratorio, agregaremos `NetworkPolicy` para aislar la comunicac
 - Gateway API v1 (Kubernetes SIG-Network)
   - <https://gateway-api.sigs.k8s.io/guides/getting-started/intro/>
   
-- Envoy Gateway v1.9+
-  - <https://gateway.envoyproxy.io/docs/>
+- Kong Gateway v3.9+
+  - <https://docs.konghq.com/gateway/>
   
 - JAX-RS (Jakarta EE 10)
   - <https://jakarta.ee/specifications/restful-web-services/>

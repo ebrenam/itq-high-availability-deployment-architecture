@@ -18,8 +18,8 @@ Antes de iniciar, debes contar con las siguientes herramientas instaladas y func
 
 - **Java OpenJDK 25** y **Apache Maven 3.8+**.
 - **Docker Engine** (v24.0+) o **Podman**.
-- **Minikube** (v1.30+) o **Kind** (Kubernetes v1.28+) — opcional para este laboratorio, obligatorio para 1.3.
-- **kubectl** configurado e interconectado con tu clúster local — opcional para este laboratorio, obligatorio para 1.3.
+- **Minikube** (v1.32+) o **Kind** (Kubernetes v1.32.0+) — opcional para este laboratorio, obligatorio para 1.3 y 3.1.
+- **kubectl** configurado e interconectado con tu clúster local — opcional para este laboratorio, obligatorio para 1.3 y 3.1.
 - **curl** o **Apache Bench (`ab`)** para generación de tráfico de prueba.
 
 ### Requisitos específicos por SO
